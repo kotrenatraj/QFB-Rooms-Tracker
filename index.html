@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hotel Room Tracker</title>
+    <link rel="manifest" href="manifest.json">
     <style>
         * {
             margin: 0;
@@ -165,11 +166,11 @@
             font-size: 13px;
             font-weight: 700;
             color: white;
-            width: 100px;
+            width: 110px;
         }
 
         th.room-header {
-            width: 100px;
+            width: 80px;
             border-right: 2px solid #1e3a8a;
         }
 
@@ -180,8 +181,9 @@
         td {
             padding: 6px;
             border-bottom: 1px solid #e5e7eb;
-            width: 100px;
+            width: 110px;
             text-align: center;
+            vertical-align: top;
         }
 
         td.room-cell {
@@ -189,13 +191,15 @@
             color: #1f2937;
             font-size: 16px;
             border-right: 2px solid #e5e7eb;
+            vertical-align: middle;
         }
 
         .status-cell {
-            padding: 10px 4px;
-            border-radius: 6px;
-            font-size: 12px;
+            padding: 4px 2px;
+            border-radius: 4px;
+            font-size: 10px;
             font-weight: 700;
+            margin-bottom: 2px;
         }
 
         .status-check-in { background: #10b981; color: white; }
@@ -203,14 +207,23 @@
         .status-occupied { background: #3b82f6; color: white; }
         .status-vacant { background: #e5e7eb; color: #6b7280; }
 
-        .guest-name {
+        .guest-info {
             font-size: 9px;
             color: #1f2937;
-            margin-top: 4px;
+            line-height: 1.2;
             font-weight: 600;
-            white-space: nowrap;
+            word-wrap: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
-            text-overflow: ellipsis;
+        }
+
+        .company-tag {
+            font-size: 8px;
+            color: #4b5563;
+            font-style: italic;
+            display: block;
         }
 
         /* Bookings List */
@@ -242,8 +255,15 @@
 
         .booking-guest {
             font-size: 14px;
-            color: #6b7280;
+            color: #111827;
             margin-top: 2px;
+            font-weight: 600;
+        }
+
+        .booking-company {
+            font-size: 12px;
+            color: #6b7280;
+            font-style: italic;
         }
 
         .booking-dates {
@@ -590,6 +610,7 @@
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             transition: all 0.2s;
+            z-index: 60;
         }
 
         .add-btn:hover {
@@ -609,7 +630,6 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
     <div class="header">
         <div class="header-top">
             <h1>🏨 Hotel Room Tracker</h1>
@@ -632,14 +652,12 @@
         </div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs">
         <button class="tab-button active" onclick="switchTab('tracker')">📅 Tracker</button>
         <button class="tab-button" onclick="switchTab('vacancy')">🔍 Vacancy</button>
         <button class="tab-button" onclick="switchTab('settings')">⚙️ Settings</button>
     </div>
 
-    <!-- Tracker Tab -->
     <div id="trackerTab" class="tab-content active">
         <div class="table-container">
             <table>
@@ -678,7 +696,6 @@
         </div>
     </div>
 
-    <!-- Vacancy Tab -->
     <div id="vacancyTab" class="tab-content">
         <div class="vacancy-section">
             <div class="vacancy-header">
@@ -711,7 +728,6 @@
         </div>
     </div>
 
-    <!-- Settings Tab -->
     <div id="settingsTab" class="tab-content">
         <div class="settings-section">
             <h2>Hotel Settings</h2>
@@ -733,7 +749,6 @@
         </div>
     </div>
 
-    <!-- Add/Edit Modal -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -749,6 +764,11 @@
             <div class="form-group">
                 <label>Guest Name</label>
                 <input type="text" id="guestName" placeholder="John Doe">
+            </div>
+
+            <div class="form-group">
+                <label>Company Name</label>
+                <input type="text" id="companyName" placeholder="Acme Corp (Optional)">
             </div>
 
             <div class="form-group">
@@ -768,7 +788,6 @@
         </div>
     </div>
 
-    <!-- Add Button -->
     <button class="add-btn" onclick="openModal()">+</button>
 
     <script>
@@ -868,19 +887,16 @@
         function switchTab(tab) {
             activeTab = tab;
             
-            // Update buttons
             document.querySelectorAll('.tab-button').forEach(btn => {
                 btn.classList.remove('active');
+                if(btn.innerText.toLowerCase().includes(tab)) btn.classList.add('active');
             });
-            event.target.classList.add('active');
             
-            // Update content
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
             document.getElementById(tab + 'Tab').classList.add('active');
             
-            // Show/hide navigation
             const weekNav = document.getElementById('weekNav');
             const filterSection = document.getElementById('filterSection');
             
@@ -893,7 +909,6 @@
             }
             
             if (tab === 'vacancy') {
-                // Set date to today if not already set or update with current bookings
                 const vacancyDateInput = document.getElementById('vacancyDate');
                 if (!vacancyDateInput.value) {
                     vacancyDateInput.value = new Date().toISOString().split('T')[0];
@@ -909,6 +924,7 @@
             document.getElementById('submitBtn').textContent = 'Add Booking';
             document.getElementById('roomNumber').value = '';
             document.getElementById('guestName').value = '';
+            document.getElementById('companyName').value = '';
             document.getElementById('checkIn').value = '';
             document.getElementById('checkOut').value = '';
             document.getElementById('modal').classList.add('active');
@@ -923,6 +939,7 @@
             document.getElementById('submitBtn').textContent = 'Update';
             document.getElementById('roomNumber').value = booking.roomNumber;
             document.getElementById('guestName').value = booking.guestName;
+            document.getElementById('companyName').value = booking.companyName || '';
             document.getElementById('checkIn').value = booking.checkIn;
             document.getElementById('checkOut').value = booking.checkOut;
             document.getElementById('modal').classList.add('active');
@@ -936,11 +953,12 @@
         function saveBooking() {
             const roomNumber = document.getElementById('roomNumber').value.trim();
             const guestName = document.getElementById('guestName').value.trim();
+            const companyName = document.getElementById('companyName').value.trim();
             const checkIn = document.getElementById('checkIn').value;
             const checkOut = document.getElementById('checkOut').value;
 
             if (!roomNumber || !guestName || !checkIn || !checkOut) {
-                alert('Please fill all fields');
+                alert('Please fill all required fields');
                 return;
             }
 
@@ -949,7 +967,6 @@
                 return;
             }
 
-            // Check for overlapping bookings for the same room
             const newCheckIn = new Date(checkIn);
             const newCheckOut = new Date(checkOut);
             newCheckIn.setHours(0, 0, 0, 0);
@@ -957,10 +974,7 @@
 
             let conflictingBooking = null;
             const hasConflict = rooms.some(booking => {
-                // Skip if editing the same booking
                 if (editingId && booking.id === editingId) return false;
-                
-                // Only check same room number
                 if (booking.roomNumber !== roomNumber) return false;
 
                 const existingCheckIn = new Date(booking.checkIn);
@@ -968,11 +982,8 @@
                 existingCheckIn.setHours(0, 0, 0, 0);
                 existingCheckOut.setHours(0, 0, 0, 0);
 
-                // Check if dates overlap
                 const overlaps = (newCheckIn <= existingCheckOut && newCheckOut >= existingCheckIn);
-                if (overlaps) {
-                    conflictingBooking = booking;
-                }
+                if (overlaps) conflictingBooking = booking;
                 return overlaps;
             });
 
@@ -980,27 +991,21 @@
                 alert(`❌ Room ${roomNumber} is already booked!\n\n` +
                       `Guest: ${conflictingBooking.guestName}\n` +
                       `Check-in: ${new Date(conflictingBooking.checkIn).toLocaleDateString()}\n` +
-                      `Check-out: ${new Date(conflictingBooking.checkOut).toLocaleDateString()}\n\n` +
-                      `Your dates overlap with this existing booking.\n` +
-                      `Please choose different dates or a different room.`);
+                      `Check-out: ${new Date(conflictingBooking.checkOut).toLocaleDateString()}`);
                 return;
             }
 
             if (editingId) {
                 const index = rooms.findIndex(r => r.id === editingId);
-                rooms[index] = { ...rooms[index], roomNumber, guestName, checkIn, checkOut };
+                rooms[index] = { ...rooms[index], roomNumber, guestName, companyName, checkIn, checkOut };
             } else {
-                rooms.push({ id: Date.now(), roomNumber, guestName, checkIn, checkOut });
+                rooms.push({ id: Date.now(), roomNumber, guestName, companyName, checkIn, checkOut });
             }
 
             saveData();
             closeModal();
             updateUI();
-            
-            // Update vacancy tab if it's active
-            if (activeTab === 'vacancy') {
-                updateVacancy();
-            }
+            if (activeTab === 'vacancy') updateVacancy();
         }
 
         function deleteBooking(id) {
@@ -1008,11 +1013,7 @@
                 rooms = rooms.filter(r => r.id !== id);
                 saveData();
                 updateUI();
-                
-                // Update vacancy tab if it's active
-                if (activeTab === 'vacancy') {
-                    updateVacancy();
-                }
+                if (activeTab === 'vacancy') updateVacancy();
             }
         }
 
@@ -1026,25 +1027,16 @@
                 return;
             }
             
-            let roomNumbers = [];
-            if (roomText) {
-                roomNumbers = roomText.split(',').map(r => r.trim()).filter(r => r);
-            } else {
-                roomNumbers = Array.from({length: total}, (_, i) => String(i + 1));
-            }
+            let roomNumbers = roomText ? roomText.split(',').map(r => r.trim()).filter(r => r) : Array.from({length: total}, (_, i) => String(i + 1));
             
             settings = { totalRooms: total, roomNumbers };
             saveData();
             alert('Settings saved!');
             updateUI();
-            
-            // Update vacancy tab if it's active (room configuration changed)
-            if (activeTab === 'vacancy') {
-                updateVacancy();
-            }
+            if (activeTab === 'vacancy') updateVacancy();
         }
 
-        // Vacancy
+        // Vacancy logic
         function updateVacancy() {
             const date = document.getElementById('vacancyDate').value;
             if (!date) return;
@@ -1052,9 +1044,7 @@
             const checkDate = new Date(date);
             checkDate.setHours(0, 0, 0, 0);
             
-            const allRooms = settings.roomNumbers.length > 0 
-                ? settings.roomNumbers 
-                : Array.from({length: settings.totalRooms}, (_, i) => String(i + 1));
+            const allRooms = settings.roomNumbers.length > 0 ? settings.roomNumbers : Array.from({length: settings.totalRooms}, (_, i) => String(i + 1));
             
             const occupiedSet = new Set();
             rooms.forEach(booking => {
@@ -1062,228 +1052,101 @@
                 const checkOut = new Date(booking.checkOut);
                 checkIn.setHours(0, 0, 0, 0);
                 checkOut.setHours(0, 0, 0, 0);
-                
-                if (checkDate >= checkIn && checkDate <= checkOut) {
-                    occupiedSet.add(booking.roomNumber);
-                }
+                if (checkDate >= checkIn && checkDate <= checkOut) occupiedSet.add(booking.roomNumber);
             });
             
             const vacant = allRooms.filter(r => !occupiedSet.has(r));
-            
             document.getElementById('totalRoomsStat').textContent = allRooms.length;
             document.getElementById('vacantRoomsStat').textContent = vacant.length;
             document.getElementById('occupiedRoomsStat').textContent = occupiedSet.size;
             
             const grid = document.getElementById('vacantRoomsGrid');
-            grid.innerHTML = '';
+            grid.innerHTML = allRooms.length === 0 ? '<p class="empty-state">Configure rooms in Settings</p>' : '';
             
-            if (allRooms.length === 0) {
-                grid.innerHTML = '<p class="empty-state">Configure hotel rooms in Settings</p>';
-                return;
-            }
-            
-            allRooms.sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true}));
-            
-            allRooms.forEach(room => {
+            allRooms.sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true})).forEach(room => {
                 const badge = document.createElement('div');
                 badge.className = 'room-badge' + (occupiedSet.has(room) ? ' occupied' : '');
                 badge.textContent = room;
-                badge.title = occupiedSet.has(room) ? 'Occupied' : 'Vacant';
                 grid.appendChild(badge);
             });
         }
 
-        // Import/Export Functions
+        // Import/Export
         function triggerImport() {
-            const message = '📤 Import Bookings\n\n' +
-                          'You will now be prompted to browse and select a .xls file.\n\n' +
-                          '⚠️ Warning: Importing will REPLACE all existing bookings!\n\n' +
-                          'Click OK to open file browser.';
-            
-            if (confirm(message)) {
+            if (confirm('📤 Import Bookings?\n\nWarning: This REPLACE all current data.')) {
                 document.getElementById('importFile').click();
             }
         }
 
-        // Export
         function exportToExcel() {
-            if (rooms.length === 0) {
-                alert('No bookings to export!');
-                return;
-            }
-
-            // Show export confirmation
-            const fileName = `Hotel_Bookings_${new Date().toISOString().split('T')[0]}.xls`;
-            const confirmed = confirm(`Export ${rooms.length} booking(s) to:\n\n${fileName}\n\nThe file will be saved to your browser's download folder.\n\nContinue?`);
-            
-            if (!confirmed) return;
-
-            let html = `
-                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        table { border-collapse: collapse; }
-                        th { background: #2563eb; color: white; padding: 10px; border: 1px solid #ddd; font-weight: bold; }
-                        td { padding: 8px; border: 1px solid #ddd; }
-                    </style>
-                </head>
-                <body>
-                    <table>
-                        <tr><th colspan="5">HOTEL ROOM TRACKER</th></tr>
-                        <tr>
-                            <th>Room</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>ID</th>
-                        </tr>
-            `;
-
-            rooms.sort((a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, {numeric: true}));
-            
-            rooms.forEach(r => {
-                html += `<tr><td>${r.roomNumber}</td><td>${r.guestName}</td><td>${r.checkIn}</td><td>${r.checkOut}</td><td>${r.id}</td></tr>`;
+            if (rooms.length === 0) { alert('No bookings to export!'); return; }
+            let html = `<html><head><meta charset="utf-8"></head><body><table><tr><th>Room</th><th>Guest</th><th>Company</th><th>Check-in</th><th>Check-out</th></tr>`;
+            rooms.sort((a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, {numeric: true})).forEach(r => {
+                html += `<tr><td>${r.roomNumber}</td><td>${r.guestName}</td><td>${r.companyName || ''}</td><td>${r.checkIn}</td><td>${r.checkOut}</td></tr>`;
             });
-
-            html += `</table><!-- DATA:${btoa(JSON.stringify(rooms))} --></body></html>`;
-
+            html += `</table></body></html>`;
             const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = fileName;
-            
-            // Add to document, click, and remove
-            document.body.appendChild(a);
+            a.download = `Hotel_Bookings_${new Date().toISOString().split('T')[0]}.xls`;
             a.click();
-            document.body.removeChild(a);
-            
-            // Clean up
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-
-            alert(`✅ Export successful!\n\nFile: ${fileName}\n\nCheck your Downloads folder.\n\nNote: The exact location depends on your browser settings.`);
         }
 
-        // Import
         function importFromExcel(e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            // Show import confirmation with file details
-            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-            const confirmed = confirm(`Import bookings from:\n\n${file.name}\nSize: ${fileSizeMB} MB\n\n⚠️ This will REPLACE all existing bookings.\n\nContinue?`);
-            
-            if (!confirmed) {
-                e.target.value = '';
-                return;
-            }
-
             const reader = new FileReader();
             reader.onload = function(ev) {
                 try {
-                    const content = ev.target.result;
-                    const match = content.match(/<!-- DATA:([A-Za-z0-9+/=]+) -->/);
-                    
+                    const match = ev.target.result.match(//);
                     if (match) {
-                        const imported = JSON.parse(atob(match[1]));
-                        
-                        if (!Array.isArray(imported) || imported.length === 0) {
-                            alert('❌ No valid booking data found in file.');
-                            e.target.value = '';
-                            return;
-                        }
-                        
-                        rooms = imported;
+                        rooms = JSON.parse(atob(match[1]));
                         saveData();
                         updateUI();
-                        
-                        // Update vacancy tab if it's active
-                        if (activeTab === 'vacancy') {
-                            updateVacancy();
-                        }
-                        
-                        alert(`✅ Import successful!\n\n${rooms.length} booking(s) imported from:\n${file.name}\n\nAll data has been restored.`);
-                    } else {
-                        alert('❌ Invalid file format!\n\nPlease select a file exported from this Hotel Room Tracker application.');
+                        if (activeTab === 'vacancy') updateVacancy();
+                        alert('✅ Import successful!');
                     }
-                } catch (err) {
-                    alert('❌ Error importing file!\n\nThe file may be corrupted or in an invalid format.\n\nError: ' + err.message);
-                }
+                } catch (err) { alert('❌ Invalid file format'); }
                 e.target.value = '';
             };
-            
-            reader.onerror = function() {
-                alert('❌ Failed to read file!\n\nPlease try again.');
-                e.target.value = '';
-            };
-            
             reader.readAsText(file);
         }
 
         // UI Updates
         function updateUI() {
-            updateWeekLabel();
-            updateTable();
-            updateBookingsList();
-            updateRoomFilter();
-            updateSettingsForm();
-        }
-
-        function updateWeekLabel() {
             const days = getWeekDays(currentWeekStart);
             document.getElementById('weekLabel').textContent = `Week of ${days[0].toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`;
-        }
-
-        function updateRoomFilter() {
-            const select = document.getElementById('roomFilter');
-            const unique = [...new Set(rooms.map(r => r.roomNumber))].sort((a, b) => 
-                String(a).localeCompare(String(b), undefined, {numeric: true})
-            );
             
+            // Room Filter
+            const select = document.getElementById('roomFilter');
+            const unique = [...new Set(rooms.map(r => r.roomNumber))].sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true}));
             const current = select.value;
             select.innerHTML = '<option value="all">All Rooms</option>';
             unique.forEach(room => {
                 const opt = document.createElement('option');
-                opt.value = room;
-                opt.textContent = `Room ${room}`;
+                opt.value = room; opt.textContent = `Room ${room}`;
                 select.appendChild(opt);
             });
-            
             if (unique.includes(current)) select.value = current;
-        }
 
-        function updateTable() {
-            const days = getWeekDays(currentWeekStart);
-            const allRooms = [...new Set(rooms.map(r => r.roomNumber))].sort((a, b) => 
-                String(a).localeCompare(String(b), undefined, {numeric: true})
-            );
-            
-            const displayRooms = selectedRoomFilter === 'all' 
-                ? allRooms 
-                : allRooms.filter(r => r === selectedRoomFilter);
-            
-            // Header
+            // Table
             const header = document.getElementById('tableHeader');
             header.innerHTML = '<th class="room-header">ROOM</th>';
             days.forEach(day => {
                 const th = document.createElement('th');
-                th.innerHTML = `
-                    <div style="font-size: 13px;">${day.toLocaleDateString('en-US', {weekday: 'short'}).toUpperCase()}</div>
-                    <div style="font-size: 12px; opacity: 0.9;">${day.getDate()} ${day.toLocaleDateString('en-US', {month: 'short'})}</div>
-                `;
+                th.innerHTML = `<div>${day.toLocaleDateString('en-US', {weekday: 'short'}).toUpperCase()}</div><div style="font-size: 11px; opacity: 0.8;">${day.getDate()} ${day.toLocaleDateString('en-US', {month: 'short'})}</div>`;
                 header.appendChild(th);
             });
-            
-            // Body
+
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            if (displayRooms.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No rooms to display</td></tr>';
-                return;
-            }
+            const allRooms = [...new Set(rooms.map(r => r.roomNumber))].sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true}));
+            const displayRooms = selectedRoomFilter === 'all' ? allRooms : allRooms.filter(r => r === selectedRoomFilter);
+            tbody.innerHTML = displayRooms.length === 0 ? '<tr><td colspan="8" class="empty-state">No rooms to display</td></tr>' : '';
             
             displayRooms.forEach(roomNum => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td class="room-cell">${roomNum}</td>`;
-                
                 days.forEach(day => {
                     const td = document.createElement('td');
                     const booking = rooms.find(r => {
@@ -1291,40 +1154,26 @@
                         const checkIn = new Date(r.checkIn);
                         const checkOut = new Date(r.checkOut);
                         const current = new Date(day);
-                        checkIn.setHours(0, 0, 0, 0);
-                        checkOut.setHours(0, 0, 0, 0);
-                        current.setHours(0, 0, 0, 0);
+                        checkIn.setHours(0, 0, 0, 0); checkOut.setHours(0, 0, 0, 0); current.setHours(0, 0, 0, 0);
                         return current >= checkIn && current <= checkOut;
                     });
-                    
                     const status = booking ? getRoomStatus(booking, day) : 'vacant';
-                    td.innerHTML = `<div class="status-cell status-${status}">${getStatusLabel(status)}</div>`;
-                    
+                    let cellHtml = `<div class="status-cell status-${status}">${getStatusLabel(status)}</div>`;
                     if (booking && status !== 'vacant') {
-                        td.innerHTML += `<div class="guest-name">${booking.guestName}</div>`;
+                        cellHtml += `<div class="guest-info">${booking.guestName}</div>`;
+                        if(booking.companyName) cellHtml += `<span class="company-tag">${booking.companyName}</span>`;
                     }
-                    
+                    td.innerHTML = cellHtml;
                     tr.appendChild(td);
                 });
-                
                 tbody.appendChild(tr);
             });
-        }
 
-        function updateBookingsList() {
+            // Booking List
             const list = document.getElementById('bookingsList');
-            let display = selectedRoomFilter === 'all' 
-                ? rooms 
-                : rooms.filter(r => r.roomNumber === selectedRoomFilter);
-            
+            let display = selectedRoomFilter === 'all' ? rooms : rooms.filter(r => r.roomNumber === selectedRoomFilter);
             display.sort((a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, {numeric: true}));
-            
-            if (display.length === 0) {
-                list.innerHTML = '<div class="empty-state">No bookings</div>';
-                return;
-            }
-            
-            list.innerHTML = '';
+            list.innerHTML = display.length === 0 ? '<div class="empty-state">No bookings</div>' : '';
             display.forEach(r => {
                 const card = document.createElement('div');
                 card.className = 'booking-card';
@@ -1332,20 +1181,26 @@
                     <div>
                         <div class="booking-room">Room ${r.roomNumber}</div>
                         <div class="booking-guest">${r.guestName}</div>
+                        ${r.companyName ? `<div class="booking-company">${r.companyName}</div>` : ''}
                         <div class="booking-dates">${new Date(r.checkIn).toLocaleDateString()} → ${new Date(r.checkOut).toLocaleDateString()}</div>
                     </div>
                     <div class="booking-actions">
                         <button class="edit-btn" onclick="openEditModal(${r.id})">✏️</button>
                         <button class="delete-btn" onclick="deleteBooking(${r.id})">🗑️</button>
-                    </div>
-                `;
+                    </div>`;
                 list.appendChild(card);
             });
-        }
 
-        function updateSettingsForm() {
             document.getElementById('totalRoomsInput').value = settings.totalRooms;
             document.getElementById('roomNumbersInput').value = settings.roomNumbers.join(', ');
+        }
+    </script>
+    
+    <script>
+        if('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW failed', err));
+            });
         }
     </script>
 </body>
