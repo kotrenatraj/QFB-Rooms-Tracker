@@ -3,60 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Room Tracker Pro v8.2</title>
+    <title>Hotel Room Tracker Pro v8.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, sans-serif; background: #f3f4f6; padding-bottom: 100px; }
-        
         .header { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; padding: 16px; position: relative; }
         .version-tag { position: absolute; top: 10px; right: 15px; font-size: 12px; font-weight: bold; background: rgba(255, 255, 255, 0.2); padding: 4px 8px; border-radius: 4px; }
-        
         .week-nav { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; margin-top: 12px; }
         .week-nav button, .btn-tool { background: white; color: #2563eb; border: none; padding: 6px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-
         .tabs { display: flex; background: white; border-bottom: 2px solid #e5e7eb; position: sticky; top: 0; z-index: 50; }
         .tab-button { flex: 1; padding: 16px; border: none; background: none; cursor: pointer; font-weight: 600; color: #6b7280; }
         .tab-button.active { color: #2563eb; border-bottom: 3px solid #2563eb; background: #f0f7ff; }
-
         .tab-content { display: none; padding: 16px; }
         .tab-content.active { display: block; }
-
-        .table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .table-container { overflow-x: auto; background: white; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; vertical-align: top; width: 120px; }
+        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; vertical-align: top; width: 140px; }
         th { background: #1e40af; color: white; font-size: 11px; }
         td.room-label { background: #f9fafb; font-weight: bold; width: 80px; vertical-align: middle; }
-
-        /* Status Badges */
-        .status-cell { border-radius: 4px; padding: 3px; font-size: 9px; font-weight: bold; color: white; margin-bottom: 4px; display: block; text-align: center; }
+        .status-cell { border-radius: 4px; padding: 3px; font-size: 9px; font-weight: bold; color: white; margin-bottom: 4px; display: block; }
         .status-check-in { background: #10b981; }
         .status-check-out { background: #f59e0b; }
         .status-occupied { background: #3b82f6; }
-        .late-alert { border: 2px solid #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
-
-        .guest-entry { margin-bottom: 8px; padding: 4px; border-radius: 4px; border: 1px solid transparent; transition: background 0.2s; cursor: pointer; }
-        .guest-entry:hover { background: #f0f4ff; border-color: #d1d5db; }
-        .guest-name { font-size: 10px; font-weight: bold; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-        .tooltip { visibility: hidden; width: 220px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 11px; pointer-events: none; }
+        .late-alert { border: 2px solid #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8); background-color: #fee2e2 !important; color: #b91c1c !important; }
+        .overlap-warning { border: 2px solid #dc2626; background: #fff1f2; padding: 4px; border-radius: 4px; margin-top: 4px; font-size: 9px; color: #991b1b; font-weight: bold; }
+        .guest-entry { margin-bottom: 10px; padding: 6px; border-radius: 4px; border: 1px solid #eee; position: relative; }
+        .guest-list-names { font-size: 10px; font-weight: bold; line-height: 1.2; display: block; }
+        .company-display { font-size: 9px; color: #6b7280; font-style: italic; display: block; margin-top: 2px; }
+        .tooltip { visibility: hidden; width: 240px; background-color: #1f2937; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -120px; opacity: 0; transition: opacity 0.3s; font-size: 11px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: none; }
+        .tooltip b { color: #60a5fa; }
         td:hover .tooltip { visibility: visible; opacity: 1; }
-
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
         .modal.active { display: flex; }
-        .modal-content { background: white; padding: 24px; border-radius: 12px; width: 95%; max-width: 450px; }
+        .modal-content { background: white; padding: 24px; border-radius: 12px; width: 95%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
-        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
-
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        .multi-guest-box { background: #f8fafc; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; }
         .add-btn { position: fixed; bottom: 24px; right: 24px; width: 60px; height: 60px; border-radius: 50%; background: #2563eb; color: white; border: none; font-size: 32px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 60; display: flex; align-items: center; justify-content: center; }
-        .add-btn:hover { background: #1d4ed8; transform: scale(1.05); }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <div class="version-tag">Version 8.2</div>
+    <div class="version-tag">Version 8.3</div>
     <h1>🏨 Hotel Tracker Pro</h1>
     <div class="week-nav">
         <button onclick="changeWeek(-7)">◀ Prev Week</button>
@@ -77,12 +68,7 @@
 </div>
 
 <div id="trackerTab" class="tab-content active">
-    <div class="table-container">
-        <table>
-            <thead><tr id="tableHeader"></tr></thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-    </div>
+    <div class="table-container"><table><thead><tr id="tableHeader"></tr></thead><tbody id="tableBody"></tbody></table></div>
 </div>
 
 <div id="vacancyTab" class="tab-content">
@@ -99,8 +85,16 @@
 <div id="modal" class="modal">
     <div class="modal-content">
         <h2 id="modalTitle">Booking Details</h2>
-        <div class="form-group"><label>Room</label><input type="text" id="formRoom"></div>
-        <div class="form-group"><label>Guest Name(s)</label><input type="text" id="formGuest"></div>
+        <div class="form-group"><label>Room Number</label><input type="text" id="formRoom"></div>
+        <div class="form-group"><label>Company Name</label><input type="text" id="formCompany" placeholder="Optional"></div>
+        
+        <div class="multi-guest-box">
+            <label style="font-size: 11px; color: #475569; margin-bottom: 5px; display: block;">Guest Names (Up to 3)</label>
+            <input type="text" id="guestName1" placeholder="Guest 1 (Required)" style="margin-bottom: 8px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 100%;">
+            <input type="text" id="guestName2" placeholder="Guest 2 (Optional)" style="margin-bottom: 8px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 100%;">
+            <input type="text" id="guestName3" placeholder="Guest 3 (Optional)" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 100%;">
+        </div>
+
         <div style="display:flex; gap:10px;">
             <div class="form-group" style="flex:1;"><label>Check-in Date</label><input type="date" id="formIn"></div>
             <div class="form-group" style="width:100px;"><label>Time</label><input type="time" id="formInTime" value="12:00"></div>
@@ -109,7 +103,7 @@
             <div class="form-group" style="flex:1;"><label>Check-out Date</label><input type="date" id="formOut"></div>
             <div class="form-group" style="width:100px;"><label>Time</label><input type="time" id="formOutTime" value="11:00"></div>
         </div>
-        <div class="form-group"><label>Checkout Comments</label><textarea id="formComments" rows="2"></textarea></div>
+        <div class="form-group"><label>Comments</label><textarea id="formComments" rows="2"></textarea></div>
         <button onclick="saveBooking()" style="width:100%; padding:14px; background:#2563eb; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Confirm Booking</button>
         <button onclick="deleteBooking()" id="deleteBtn" style="width:100%; margin-top:10px; background:#ef4444; color:white; border:none; border-radius:6px; padding:10px; display:none; cursor:pointer;">Delete Entry</button>
         <button onclick="closeModal()" style="width:100%; margin-top:10px; background:none; border:none; color:#666; cursor:pointer;">Cancel</button>
@@ -119,7 +113,6 @@
 <button class="add-btn" onclick="openModal()">+</button>
 
 <script>
-    /* Core Data Handling */
     let bookings = JSON.parse(localStorage.getItem('hotelBookings')) || [];
     let config = JSON.parse(localStorage.getItem('hotelConfig')) || { rooms: ['101', '102', '103'], path: '' };
     let viewDate = new Date();
@@ -158,8 +151,6 @@
             days.forEach(day => {
                 const td = document.createElement('td');
                 const dStr = day.toISOString().split('T')[0];
-                
-                // CRITICAL FIX: Filter all bookings touching this specific room and day
                 const activeBookings = bookings.filter(b => b.room === roomNum && dStr >= b.in && dStr <= b.out);
                 
                 if(activeBookings.length > 0) {
@@ -170,18 +161,33 @@
                         
                         const isLate = status === "check-out" && m.outTime > "11:00";
                         
+                        // Overlap Communication Warning
+                        let showOverlapMsg = false;
+                        if(status === "check-in") {
+                            const prevGuestOutToday = bookings.find(b => b.room === roomNum && b.id !== m.id && b.out === m.in && b.outTime > m.inTime);
+                            if(prevGuestOutToday) showOverlapMsg = true;
+                        }
+
                         const entry = document.createElement('div');
                         entry.className = 'guest-entry';
                         entry.onclick = (e) => { e.stopPropagation(); editBooking(m.id); };
+                        
+                        const guestList = m.guests.filter(g => g).join('<br>');
+                        
                         entry.innerHTML = `
                             <div class="status-cell status-${status} ${isLate ? 'late-alert' : ''}">${status.toUpperCase()}</div>
-                            <span class="guest-name">${m.guest}</span>
+                            <span class="guest-list-names">${guestList}</span>
+                            ${m.company ? `<span class="company-display">${m.company}</span>` : ''}
+                            ${showOverlapMsg ? `<div class="overlap-warning">⚠️ Guest need to be communicated</div>` : ''}
                             <div class="tooltip">
-                                <b>Guest:</b> ${m.guest}<br>
+                                <b>Guests:</b><br>${guestList}<br>
+                                <b>Company:</b> ${m.company || 'N/A'}<br>
                                 <b>Check-in:</b> ${m.inTime} (${m.in})<br>
                                 <b>Check-out:</b> ${m.outTime} (${m.out})<br>
+                                <hr style="margin:5px 0; border:0; border-top:1px solid #4b5563;">
                                 <b>Note:</b> ${m.comments || 'None'}<br>
-                                ${isLate ? '<b style="color:#ff4d4d;">⚠️ LATE CHECK-OUT</b>' : ''}
+                                ${isLate ? '<b style="color:#ef4444;">⚠️ LATE CHECK-OUT ALERT</b>' : ''}
+                                ${showOverlapMsg ? '<b style="color:#ef4444;">⚠️ TIMING OVERLAP DETECTED</b>' : ''}
                             </div>
                         `;
                         td.appendChild(entry);
@@ -199,34 +205,26 @@
     function saveBooking() {
         const room = document.getElementById('formRoom').value;
         const inDate = document.getElementById('formIn').value;
-        const inTime = document.getElementById('formInTime').value;
         const outDate = document.getElementById('formOut').value;
-        const outTime = document.getElementById('formOutTime').value;
+        
+        const g1 = document.getElementById('guestName1').value.trim();
+        const g2 = document.getElementById('guestName2').value.trim();
+        const g3 = document.getElementById('guestName3').value.trim();
 
-        // Collision Check: Block if dates overlap, but allow same-day turnover
-        const conflict = bookings.find(b => 
-            b.room === room && 
-            b.id != activeId && 
-            (
-                (inDate > b.in && inDate < b.out) || 
-                (outDate > b.in && outDate < b.out) ||
-                (inDate < b.in && outDate > b.out)
-            )
-        );
-
-        if(conflict) {
-            alert(`⛔ BOOKING CONFLICT!\n\nRoom ${room} is already occupied by ${conflict.guest} between ${conflict.in} and ${conflict.out}.`);
+        if(!room || !inDate || !outDate || !g1) {
+            alert("Room, Dates, and at least Guest 1 are required!");
             return;
         }
 
         const data = {
             id: activeId || Date.now().toString(),
             room: room,
-            guest: document.getElementById('formGuest').value,
+            company: document.getElementById('formCompany').value,
+            guests: [g1, g2, g3],
             in: inDate,
-            inTime: inTime,
+            inTime: document.getElementById('formInTime').value,
             out: outDate,
-            outTime: outTime,
+            outTime: document.getElementById('formOutTime').value,
             comments: document.getElementById('formComments').value
         };
 
@@ -249,7 +247,10 @@
         document.getElementById('modalTitle').innerText = "Update Booking";
         document.getElementById('deleteBtn').style.display = 'block';
         document.getElementById('formRoom').value = b.room;
-        document.getElementById('formGuest').value = b.guest;
+        document.getElementById('formCompany').value = b.company || '';
+        document.getElementById('guestName1').value = b.guests[0] || '';
+        document.getElementById('guestName2').value = b.guests[1] || '';
+        document.getElementById('guestName3').value = b.guests[2] || '';
         document.getElementById('formIn').value = b.in;
         document.getElementById('formInTime').value = b.inTime;
         document.getElementById('formOut').value = b.out;
@@ -261,10 +262,7 @@
     function openWithRoom(r, d) {
         openModal();
         document.getElementById('formRoom').value = r;
-        if(d) {
-            document.getElementById('formIn').value = d;
-            document.getElementById('formOut').value = d;
-        }
+        if(d) { document.getElementById('formIn').value = d; document.getElementById('formOut').value = d; }
     }
 
     function openModal() {
@@ -279,7 +277,6 @@
         document.getElementById('modal').classList.add('active');
     }
 
-    /* Helper Utilities */
     function closeModal() { document.getElementById('modal').classList.remove('active'); }
     function changeWeek(o) { viewDate.setDate(viewDate.getDate() + o); updateUI(); }
     function deleteBooking() { 
@@ -296,7 +293,7 @@
         config.path = document.getElementById('backupPathInput').value;
         localStorage.setItem('hotelConfig', JSON.stringify(config));
         updateUI();
-        alert("Configuration updated successfully!");
+        alert("Configuration updated!");
     }
 
     function updateVacancy() {
@@ -326,12 +323,11 @@
             localStorage.setItem('hotelBookings', JSON.stringify(bookings));
             localStorage.setItem('hotelConfig', JSON.stringify(config));
             updateUI();
-            alert("Data restore complete!");
+            alert("Data restored!");
         };
         reader.readAsText(e.target.files[0]);
     }
 
-    // Initialize UI
     document.getElementById('roomNumbersInput').value = config.rooms.join(', ');
     document.getElementById('backupPathInput').value = config.path || '';
     updateUI();
