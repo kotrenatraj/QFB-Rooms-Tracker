@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Room Tracker Pro v8.4</title>
+    <title>Hotel Room Tracker Pro v8.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,7 +18,7 @@
         .tab-content { display: none; padding: 16px; }
         .tab-content.active { display: block; }
         
-        /* Stats Styling */
+        /* Stats */
         .stats-container { display: flex; gap: 10px; margin-bottom: 15px; }
         .stat-card { flex: 1; background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .stat-val { display: block; font-size: 20px; font-weight: bold; color: #1e40af; }
@@ -30,15 +30,17 @@
         th { background: #1e40af; color: white; font-size: 11px; }
         td.room-label { background: #f9fafb; font-weight: bold; width: 80px; vertical-align: middle; }
         
+        /* Badges & Alerts */
         .status-cell { border-radius: 4px; padding: 3px; font-size: 9px; font-weight: bold; color: white; margin-bottom: 4px; display: block; }
         .status-check-in { background: #10b981; }
         .status-check-out { background: #f59e0b; }
         .status-occupied { background: #3b82f6; }
         .late-alert { border: 2px solid #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8); background-color: #fee2e2 !important; color: #b91c1c !important; }
-        .overlap-warning { border: 2px solid #dc2626; background: #fff1f2; padding: 4px; border-radius: 4px; margin-top: 4px; font-size: 9px; color: #991b1b; font-weight: bold; }
+        .overlap-warning { border: 2px solid #dc2626; background: #fff1f2; padding: 6px; border-radius: 4px; margin-top: 6px; font-size: 10px; color: #991b1b; font-weight: bold; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
         
-        .guest-entry { margin-bottom: 10px; padding: 6px; border-radius: 4px; border: 1px solid #eee; }
-        .tooltip { visibility: hidden; width: 240px; background-color: #1f2937; color: #fff; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -120px; opacity: 0; transition: opacity 0.3s; font-size: 11px; text-align: left; }
+        .guest-entry { margin-bottom: 10px; padding: 6px; border-radius: 4px; border: 1px solid #eee; position: relative; }
+        .tooltip { visibility: hidden; width: 240px; background-color: #1f2937; color: #fff; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -120px; opacity: 0; transition: opacity 0.3s; font-size: 11px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         td:hover .tooltip { visibility: visible; opacity: 1; }
 
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
@@ -54,7 +56,7 @@
 <body>
 
 <div class="header">
-    <div class="version-tag">Version 8.4</div>
+    <div class="version-tag">Version 8.5</div>
     <h1>🏨 Hotel Tracker Pro</h1>
     <div class="week-nav">
         <button onclick="changeWeek(-7)">◀ Prev Week</button>
@@ -95,7 +97,7 @@
 
 <div id="settingsTab" class="tab-content">
     <div class="form-group"><label>Room Numbers (Comma separated)</label><textarea id="roomNumbersInput" rows="4"></textarea></div>
-    <div class="form-group"><label>Default Backup Path</label><input type="text" id="backupPathInput"></div>
+    <div class="form-group"><label>Backup Folder Path</label><input type="text" id="backupPathInput" placeholder="e.g. C:\MyHotel\Backups\"></div>
     <button onclick="saveSettings()" class="btn-tool" style="background:#2563eb; color:white; width:100%; padding:14px;">Update Configuration</button>
 </div>
 
@@ -144,7 +146,7 @@
         if(t === 'vacancy') updateVacancy();
     }
 
-    /* Logic & UI */
+    /* Core UI */
     function updateUI() {
         const days = [];
         for(let i=0; i<7; i++) { let d = new Date(viewDate); d.setDate(d.getDate() + i); days.push(d); }
@@ -166,21 +168,27 @@
                     matches.forEach(m => {
                         let status = (ds === m.in) ? 'check-in' : (ds === m.out ? 'check-out' : 'occupied');
                         let isLate = status === 'check-out' && m.outTime > '11:00';
-                        let overlap = status === 'check-in' && bookings.some(b => b.room === room && b.id !== m.id && b.out === m.in && b.outTime > m.inTime);
                         
+                        // HIGHLIGHT OVERLAP
+                        let overlapBooking = null;
+                        if(status === 'check-in') {
+                            overlapBooking = bookings.find(b => b.room === room && b.id !== m.id && b.out === m.in && b.outTime > m.inTime);
+                        }
+
                         let div = document.createElement('div');
                         div.className = 'guest-entry';
                         div.onclick = (e) => { e.stopPropagation(); editBooking(m.id); };
                         div.innerHTML = `
                             <div class="status-cell status-${status} ${isLate ? 'late-alert' : ''}">${status.toUpperCase()}</div>
                             <span style="font-size:10px; font-weight:bold;">${m.gs.filter(g=>g).join('<br>')}</span>
-                            ${overlap ? '<div class="overlap-warning">⚠️ Guest need to be communicated</div>' : ''}
+                            ${overlapBooking ? `<div class="overlap-warning">⚠️ Guest need to be communicated<br>(Conflict: Out at ${overlapBooking.outTime})</div>` : ''}
                             <div class="tooltip">
                                 <b>Guests:</b><br>${m.gs.filter(g=>g).join('<br>')}<br>
                                 <b>Company:</b> ${m.cp || '-'}<br>
-                                <b>Check-in:</b> ${m.inTime}<br><b>Check-out:</b> ${m.outTime}<br>
+                                <b>In:</b> ${m.inTime}<br><b>Check-out:</b> ${m.outTime}<br>
                                 <hr style="margin:5px 0; border:0; border-top:1px solid #555;">
                                 ${isLate ? '<b style="color:#ef4444;">⚠️ LATE CHECK-OUT ALERT</b><br>' : ''}
+                                ${overlapBooking ? '<b style="color:#ef4444;">⚠️ TIMING OVERLAP DETECTED</b><br>' : ''}
                                 <b>Note:</b> ${m.cm || '-'}
                             </div>`;
                         td.appendChild(div);
@@ -192,7 +200,6 @@
         });
     }
 
-    /* Vacancy Statistics & Default Date */
     function updateVacancy() {
         const vInput = document.getElementById('vacancyDate');
         if(!vInput.value) vInput.value = new Date().toISOString().split('T')[0];
@@ -209,7 +216,6 @@
         document.getElementById('availRooms').innerText = config.rooms.length - occCount;
     }
 
-    /* Screenshot Functions */
     function captureScreen() {
         const elementId = activeTab === 'tracker' ? 'trackerCaptureArea' : 'vacancyCaptureArea';
         html2canvas(document.getElementById(elementId), { backgroundColor: "#f3f4f6" }).then(canvas => {
@@ -220,7 +226,31 @@
         });
     }
 
-    /* Data Management */
+    /* Backup with Path Awareness */
+    function exportData() {
+        const data = JSON.stringify({bookings, config});
+        const a = document.createElement('a');
+        a.href = "data:text/json;charset=utf-8," + encodeURIComponent(data);
+        a.download = 'hotel_backup.xls';
+        a.click();
+        
+        const path = config.path || "your default downloads folder";
+        alert(`Backup created successfully!\n\nPlease remember to move the file 'hotel_backup.xls' to your designated backup folder:\n\n📁 ${path}`);
+    }
+
+    function importData(e) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const data = JSON.parse(ev.target.result);
+            bookings = data.bookings; config = data.config;
+            localStorage.setItem('hotelBookings', JSON.stringify(bookings));
+            localStorage.setItem('hotelConfig', JSON.stringify(config));
+            updateUI(); alert("Data Restore Complete!");
+        };
+        reader.readAsText(e.target.files[0]);
+    }
+
+    /* Standard Logic */
     function saveBooking() {
         const data = {
             id: activeId || Date.now().toString(),
@@ -251,25 +281,6 @@
         document.getElementById('formOut').value = b.out; document.getElementById('formOutTime').value = b.outTime;
         document.getElementById('formComments').value = b.cm;
         document.getElementById('modal').classList.add('active');
-    }
-
-    function exportData() {
-        const data = JSON.stringify({bookings, config});
-        const a = document.createElement('a');
-        a.href = "data:text/json;charset=utf-8," + encodeURIComponent(data);
-        a.download = 'hotel_backup.xls'; a.click();
-    }
-
-    function importData(e) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const data = JSON.parse(ev.target.result);
-            bookings = data.bookings; config = data.config;
-            localStorage.setItem('hotelBookings', JSON.stringify(bookings));
-            localStorage.setItem('hotelConfig', JSON.stringify(config));
-            updateUI(); alert("Restored!");
-        };
-        reader.readAsText(e.target.files[0]);
     }
 
     function openWithRoom(r, d) { openModal(); document.getElementById('formRoom').value = r; document.getElementById('formIn').value = d; document.getElementById('formOut').value = d; }
