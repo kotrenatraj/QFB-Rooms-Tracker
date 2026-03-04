@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Room Tracker Pro v8.7</title>
+    <title>Hotel Room Tracker Pro v8.8</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,36 +18,34 @@
         .tab-content { display: none; padding: 16px; }
         .tab-content.active { display: block; }
 
-        /* Table Mapping Styles */
+        /* Table Rendering */
         .table-container { overflow-x: auto; background: white; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; vertical-align: top; width: 160px; min-height: 80px; }
+        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; vertical-align: top; width: 160px; min-height: 100px; }
         th { background: #1e40af; color: white; font-size: 11px; }
         td.room-label { background: #f9fafb; font-weight: bold; width: 80px; vertical-align: middle; }
 
-        /* Booking Entry Styling */
+        /* Guest Entry Stacking */
         .guest-entry { margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; text-align: left; cursor: pointer; position: relative; }
         .status-cell { border-radius: 4px; padding: 3px; font-size: 9px; font-weight: bold; color: white; margin-bottom: 4px; display: block; text-align: center; text-transform: uppercase; }
         .status-check-in { background: #10b981; }
         .status-check-out { background: #f59e0b; }
         .status-occupied { background: #3b82f6; }
         
-        .late-alert { border: 2px solid #ef4444; background-color: #fee2e2 !important; color: #b91c1c !important; box-shadow: 0 0 5px rgba(239,68,68,0.5); }
+        .late-alert { border: 2px solid #ef4444; background-color: #fee2e2 !important; color: #b91c1c !important; }
         .overlap-warning { border: 2px solid #dc2626; background: #fff1f2; padding: 4px; border-radius: 4px; margin-top: 4px; font-size: 9px; color: #991b1b; font-weight: bold; }
+        .extension-blocked { opacity: 0.7; border-style: dashed; }
 
         .guest-names { font-size: 10px; font-weight: bold; display: block; line-height: 1.2; }
-        .company-name { font-size: 9px; color: #64748b; font-style: italic; display: block; margin-top: 2px; }
+        .company-name { font-size: 9px; color: #2563eb; font-weight: bold; display: block; margin-top: 2px; }
 
-        .tooltip { visibility: hidden; width: 220px; background-color: #1f2937; color: #fff; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 105%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 11px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: none; }
+        .tooltip { visibility: hidden; width: 220px; background-color: #1f2937; color: #fff; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 105%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 11px; pointer-events: none; }
         .guest-entry:hover .tooltip { visibility: visible; opacity: 1; }
 
-        /* Vacancy Stats */
-        .stats-bar { display: flex; gap: 10px; margin-bottom: 15px; }
-        .stat-card { flex: 1; padding: 15px; background: white; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
+        /* Modal */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
         .modal.active { display: flex; }
-        .modal-content { background: white; padding: 24px; border-radius: 12px; width: 95%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 12px; width: 95%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
         .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
@@ -58,7 +56,7 @@
 <body>
 
 <div class="header">
-    <div class="version-tag">Version 8.7</div>
+    <div class="version-tag">Version 8.8</div>
     <h1>🏨 Hotel Tracker Pro</h1>
     <div class="week-nav">
         <button onclick="changeWeek(-7)">◀ Prev Week</button>
@@ -68,7 +66,7 @@
     <div style="margin-top:10px;">
         <button class="btn-tool" onclick="exportData()">📥 Backup</button>
         <button class="btn-tool" onclick="document.getElementById('importInput').click()">📤 Restore</button>
-        <button class="btn-tool" style="background:#10b981; color:white;" onclick="captureScreen()">📸 Save PNG</button>
+        <button class="btn-tool" style="background:#10b981; color:white;" onclick="captureScreen()">📸 Save View</button>
         <input type="file" id="importInput" style="display:none" onchange="importData(event)">
     </div>
 </div>
@@ -87,27 +85,27 @@
 
 <div id="vacancyTab" class="tab-content">
     <div id="vacancyCaptureArea">
-        <div class="stats-bar">
-            <div class="stat-card"><b>Total:</b> <span id="totalRooms">0</span></div>
-            <div class="stat-card"><b>Occupied:</b> <span id="occRooms" style="color:#ef4444;">0</span></div>
-            <div class="stat-card"><b>Available:</b> <span id="availRooms" style="color:#10b981;">0</span></div>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <div style="flex:1; padding:10px; background:white; border-radius:8px; text-align:center;"><b>Total:</b> <span id="totalRooms">0</span></div>
+            <div style="flex:1; padding:10px; background:white; border-radius:8px; text-align:center;"><b>Occupied:</b> <span id="occRooms" style="color:red;">0</span></div>
+            <div style="flex:1; padding:10px; background:white; border-radius:8px; text-align:center;"><b>Available:</b> <span id="availRooms" style="color:green;">0</span></div>
         </div>
-        <input type="date" id="vacancyDate" onchange="updateVacancy()" style="padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #ccc;">
+        <input type="date" id="vacancyDate" onchange="updateVacancy()" style="padding:10px; margin-bottom:15px; width:100%;">
         <div id="vacantRoomsGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px;"></div>
     </div>
 </div>
 
 <div id="settingsTab" class="tab-content">
     <div class="form-group"><label>Room Numbers (Comma separated)</label><textarea id="roomNumbersInput" rows="4"></textarea></div>
-    <div class="form-group"><label>Backup Folder Path</label><input type="text" id="backupPathInput"></div>
-    <button onclick="saveSettings()" class="btn-tool" style="background:#2563eb; color:white; width:100%; padding:14px;">Save Configuration</button>
+    <div class="form-group"><label>Backup Path</label><input type="text" id="backupPathInput"></div>
+    <button onclick="saveSettings()" class="btn-tool" style="background:#2563eb; color:white; width:100%; padding:14px;">Save Settings</button>
 </div>
 
 <div id="modal" class="modal">
     <div class="modal-content">
         <h2 id="modalTitle">Booking Details</h2>
         <div class="form-group"><label>Room Number</label><input type="text" id="formRoom"></div>
-        <div class="form-group"><label>Company Name</label><input type="text" id="formCompany"></div>
+        <div class="form-group"><label>Company Name</label><input type="text" id="formCompany" placeholder="Optional"></div>
         <div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:12px; border:1px solid #e2e8f0;">
             <label style="font-size:11px; font-weight:bold;">Guest Names (Up to 3)</label>
             <input type="text" id="g1" placeholder="Guest 1 (Required)" style="margin-bottom:5px; padding:8px; width:100%;">
@@ -115,15 +113,15 @@
             <input type="text" id="g3" placeholder="Guest 3" style="padding:8px; width:100%;">
         </div>
         <div style="display:flex; gap:10px;">
-            <div class="form-group" style="flex:1;"><label>Check-in Date</label><input type="date" id="formIn"></div>
+            <div class="form-group" style="flex:1;"><label>In Date</label><input type="date" id="formIn"></div>
             <div class="form-group" style="width:100px;"><label>Time</label><input type="time" id="formInTime" value="12:00"></div>
         </div>
         <div style="display:flex; gap:10px;">
-            <div class="form-group" style="flex:1;"><label>Check-out Date</label><input type="date" id="formOut"></div>
+            <div class="form-group" style="flex:1;"><label>Out Date</label><input type="date" id="formOut"></div>
             <div class="form-group" style="width:100px;"><label>Time</label><input type="time" id="formOutTime" value="11:00"></div>
         </div>
         <div class="form-group"><label>Comments</label><textarea id="formComments" rows="2"></textarea></div>
-        <button onclick="saveBooking()" style="width:100%; padding:14px; background:#2563eb; color:white; border:none; border-radius:6px; font-weight:bold;">Save Booking</button>
+        <button onclick="saveBooking()" id="confirmBtn" style="width:100%; padding:14px; background:#2563eb; color:white; border:none; border-radius:6px; font-weight:bold;">Save Booking</button>
         <button onclick="deleteBooking()" id="deleteBtn" style="width:100%; margin-top:8px; background:#ef4444; color:white; border:none; border-radius:6px; padding:10px; display:none;">Delete</button>
         <button onclick="closeModal()" style="width:100%; margin-top:8px; background:none; border:none; color:#666;">Cancel</button>
     </div>
@@ -137,10 +135,8 @@
     let viewDate = new Date();
     viewDate.setDate(viewDate.getDate() - (viewDate.getDay() === 0 ? 6 : viewDate.getDay() - 1));
     let activeId = null;
-    let activeTab = 'tracker';
 
     function switchTab(t) {
-        activeTab = t;
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
         document.getElementById(t + 'Tab').classList.add('active');
@@ -148,6 +144,7 @@
         if(t === 'vacancy') updateVacancy();
     }
 
+    /* Core Rendering Engine */
     function updateUI() {
         const days = [];
         for(let i=0; i<7; i++) { let d = new Date(viewDate); d.setDate(d.getDate() + i); days.push(d); }
@@ -167,7 +164,7 @@
                 const td = document.createElement('td');
                 const ds = day.toISOString().split('T')[0];
                 
-                // DATA STACKING: Get every unique booking for this day
+                // STACKING LOGIC: Find all matches for this day and room
                 const dailyMatches = bookings.filter(b => b.room === room && ds >= b.in && ds <= b.out);
                 
                 if(dailyMatches.length > 0) {
@@ -175,15 +172,12 @@
                         const status = (ds === m.in) ? 'check-in' : (ds === m.out ? 'check-out' : 'occupied');
                         const isLate = status === 'check-out' && m.outTime > '11:00';
                         
-                        // Overlap Logic: Find if another booking ends today after this one starts
-                        let overlapMsg = null;
-                        if(status === 'check-in') {
-                            const conflict = dailyMatches.find(b => b.id !== m.id && b.out === m.in && b.outTime > m.inTime);
-                            if(conflict) overlapMsg = `⚠️ Guest need to be communicated (Out: ${conflict.outTime})`;
-                        }
+                        // Rule: Check for overlap with a check-in today
+                        const nextGuestInToday = bookings.find(b => b.room === room && b.id !== m.id && b.in === ds);
+                        const isExtensionBlocked = (status === 'check-out' && nextGuestInToday);
 
                         const div = document.createElement('div');
-                        div.className = `guest-entry ${isLate ? 'late-alert' : ''}`;
+                        div.className = `guest-entry ${isLate ? 'late-alert' : ''} ${isExtensionBlocked ? 'extension-blocked' : ''}`;
                         div.onclick = (e) => { e.stopPropagation(); editBooking(m.id); };
                         
                         const names = m.gs.filter(g => g).join('<br>');
@@ -191,12 +185,12 @@
                             <div class="status-cell status-${status}">${status.toUpperCase()}</div>
                             <span class="guest-names">${names}</span>
                             ${m.cp ? `<span class="company-name">${m.cp}</span>` : ''}
-                            ${overlapMsg ? `<div class="overlap-warning">${overlapMsg}</div>` : ''}
+                            ${isExtensionBlocked ? `<div class="overlap-warning">⚠️ Checkout extension blocked (New In: ${nextGuestInToday.inTime})</div>` : ''}
                             <div class="tooltip">
                                 <b>Guests:</b> ${m.gs.filter(g=>g).join(', ')}<br>
-                                <b>Time:</b> ${m.inTime} to ${m.outTime}<br>
-                                <b>Notes:</b> ${m.cm || '-'}<br>
-                                ${isLate ? '<b style="color:#ef4444;">⚠️ LATE CHECK-OUT ALERT</b>' : ''}
+                                <b>In/Out:</b> ${m.inTime} - ${m.outTime}<br>
+                                <b>Note:</b> ${m.cm || '-'}<br>
+                                ${isExtensionBlocked ? '<b style="color:#ef4444;">⛔ EXTENSION FORBIDDEN</b>' : ''}
                             </div>
                         `;
                         td.appendChild(div);
@@ -213,7 +207,7 @@
 
     function saveBooking() {
         const guest1 = document.getElementById('g1').value.trim();
-        if(!guest1) { alert("Guest 1 Name is required!"); return; }
+        if(!guest1) { alert("Guest 1 is required!"); return; }
 
         const data = {
             id: activeId || Date.now().toString(),
@@ -238,34 +232,46 @@
         closeModal(); updateUI();
     }
 
-    /* Core Helpers */
+    /* Editing Restrictions */
     function editBooking(id) {
         const b = bookings.find(item => item.id == id);
         activeId = id;
+        
+        // Logical Check: If someone is checking in on this person's checkout date, block date change
+        const conflict = bookings.find(x => x.room === b.room && x.id !== b.id && x.in === b.out);
+
         document.getElementById('modalTitle').innerText = "Edit Booking";
         document.getElementById('deleteBtn').style.display = 'block';
         document.getElementById('formRoom').value = b.room;
         document.getElementById('formCompany').value = b.cp || '';
-        document.getElementById('g1').value = b.gs[0]; document.getElementById('g2').value = b.gs[1] || ''; document.getElementById('g3').value = b.gs[2] || '';
-        document.getElementById('formIn').value = b.in; document.getElementById('formInTime').value = b.inTime;
-        document.getElementById('formOut').value = b.out; document.getElementById('formOutTime').value = b.outTime;
+        document.getElementById('g1').value = b.gs[0]; 
+        document.getElementById('g2').value = b.gs[1] || ''; 
+        document.getElementById('g3').value = b.gs[2] || '';
+        document.getElementById('formIn').value = b.in; 
+        document.getElementById('formInTime').value = b.inTime;
+        document.getElementById('formOut').value = b.out; 
+        document.getElementById('formOutTime').value = b.outTime;
         document.getElementById('formComments').value = b.cm || '';
+
+        // Apply Restrictions
+        const isCompany = b.cp && b.cp.trim() !== "";
+        document.getElementById('formOut').disabled = (conflict && !isCompany);
+        
+        if (conflict) {
+            document.getElementById('formComments').value += "\n(Note: Checkout extension blocked due to next guest)";
+        }
+
         document.getElementById('modal').classList.add('active');
     }
 
+    /* Helpers */
     function openWithRoom(r, d) { openModal(); document.getElementById('formRoom').value = r; document.getElementById('formIn').value = d; document.getElementById('formOut').value = d; }
-    function openModal() { activeId = null; document.getElementById('deleteBtn').style.display = 'none'; document.querySelectorAll('#modal input, #modal textarea').forEach(i => i.value = (i.id.includes('Time') ? (i.id.includes('In') ? '12:00' : '11:00') : '')); document.getElementById('modal').classList.add('active'); }
+    function openModal() { activeId = null; document.getElementById('deleteBtn').style.display = 'none'; document.querySelectorAll('#modal input, #modal textarea').forEach(i => { i.disabled = false; i.value = (i.id.includes('Time') ? (i.id.includes('In') ? '12:00' : '11:00') : ''); }); document.getElementById('modal').classList.add('active'); }
     function closeModal() { document.getElementById('modal').classList.remove('active'); }
     function changeWeek(o) { viewDate.setDate(viewDate.getDate() + o); updateUI(); }
     function deleteBooking() { if(confirm("Delete?")) { bookings = bookings.filter(b => b.id != activeId); localStorage.setItem('hotelBookings', JSON.stringify(bookings)); closeModal(); updateUI(); } }
+    function saveSettings() { config.rooms = document.getElementById('roomNumbersInput').value.split(',').map(s => s.trim()).filter(s => s); config.path = document.getElementById('backupPathInput').value; localStorage.setItem('hotelConfig', JSON.stringify(config)); updateUI(); alert("Saved!"); }
     
-    function saveSettings() {
-        config.rooms = document.getElementById('roomNumbersInput').value.split(',').map(s => s.trim()).filter(s => s);
-        config.path = document.getElementById('backupPathInput').value;
-        localStorage.setItem('hotelConfig', JSON.stringify(config));
-        updateUI(); alert("Saved!");
-    }
-
     function updateVacancy() {
         const vInput = document.getElementById('vacancyDate');
         if(!vInput.value) vInput.value = new Date().toISOString().split('T')[0];
@@ -286,7 +292,7 @@
         const a = document.createElement('a');
         a.href = "data:text/json;charset=utf-8," + encodeURIComponent(data);
         a.download = 'hotel_backup.xls'; a.click();
-        alert(`Backup Saved! Ensure you move the file to: ${config.path || 'your manual folder'}`);
+        alert(`Saved! Move file to: ${config.path || 'Downloads'}`);
     }
 
     function importData(e) {
@@ -304,7 +310,7 @@
     function captureScreen() {
         const id = activeTab === 'tracker' ? 'trackerCaptureArea' : 'vacancyCaptureArea';
         html2canvas(document.getElementById(id), { backgroundColor: "#f3f4f6" }).then(canvas => {
-            let l = document.createElement('a'); l.download = `Hotel_View.png`; l.href = canvas.toDataURL(); l.click();
+            let l = document.createElement('a'); l.download = `Hotel_Capture.png`; l.href = canvas.toDataURL(); l.click();
         });
     }
 
