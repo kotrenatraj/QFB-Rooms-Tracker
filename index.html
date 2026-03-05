@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Room Tracker Pro v8.8</title>
+    <title>Hotel Room Tracker Pro v8.9</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,14 +18,13 @@
         .tab-content { display: none; padding: 16px; }
         .tab-content.active { display: block; }
 
-        /* Table Rendering */
         .table-container { overflow-x: auto; background: white; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: center; vertical-align: top; width: 160px; min-height: 100px; }
         th { background: #1e40af; color: white; font-size: 11px; }
-        td.room-label { background: #f9fafb; font-weight: bold; width: 80px; vertical-align: middle; }
+        td.room-label { background: #f9fafb; font-weight: bold; width: 90px; vertical-align: middle; cursor: pointer; }
+        td.room-label:hover { background: #eff6ff; color: #2563eb; }
 
-        /* Guest Entry Stacking */
         .guest-entry { margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; text-align: left; cursor: pointer; position: relative; }
         .status-cell { border-radius: 4px; padding: 3px; font-size: 9px; font-weight: bold; color: white; margin-bottom: 4px; display: block; text-align: center; text-transform: uppercase; }
         .status-check-in { background: #10b981; }
@@ -34,7 +33,6 @@
         
         .late-alert { border: 2px solid #ef4444; background-color: #fee2e2 !important; color: #b91c1c !important; }
         .overlap-warning { border: 2px solid #dc2626; background: #fff1f2; padding: 4px; border-radius: 4px; margin-top: 4px; font-size: 9px; color: #991b1b; font-weight: bold; }
-        .extension-blocked { opacity: 0.7; border-style: dashed; }
 
         .guest-names { font-size: 10px; font-weight: bold; display: block; line-height: 1.2; }
         .company-name { font-size: 9px; color: #2563eb; font-weight: bold; display: block; margin-top: 2px; }
@@ -42,7 +40,6 @@
         .tooltip { visibility: hidden; width: 220px; background-color: #1f2937; color: #fff; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; bottom: 105%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 11px; pointer-events: none; }
         .guest-entry:hover .tooltip { visibility: visible; opacity: 1; }
 
-        /* Modal */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
         .modal.active { display: flex; }
         .modal-content { background: white; padding: 24px; border-radius: 12px; width: 95%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
@@ -56,7 +53,7 @@
 <body>
 
 <div class="header">
-    <div class="version-tag">Version 8.8</div>
+    <div class="version-tag">Version 8.9</div>
     <h1>🏨 Hotel Tracker Pro</h1>
     <div class="week-nav">
         <button onclick="changeWeek(-7)">◀ Prev Week</button>
@@ -96,9 +93,9 @@
 </div>
 
 <div id="settingsTab" class="tab-content">
-    <div class="form-group"><label>Room Numbers (Comma separated)</label><textarea id="roomNumbersInput" rows="4"></textarea></div>
-    <div class="form-group"><label>Backup Path</label><input type="text" id="backupPathInput"></div>
-    <button onclick="saveSettings()" class="btn-tool" style="background:#2563eb; color:white; width:100%; padding:14px;">Save Settings</button>
+    <div class="form-group"><label>Room Numbers (Comma separated, e.g. 1, 2, 3, 4, 5)</label><textarea id="roomNumbersInput" rows="4"></textarea></div>
+    <div class="form-group"><label>Backup Folder Path</label><input type="text" id="backupPathInput"></div>
+    <button onclick="saveSettings()" class="btn-tool" style="background:#2563eb; color:white; width:100%; padding:14px;">Update Rooms & Path</button>
 </div>
 
 <div id="modal" class="modal">
@@ -131,7 +128,7 @@
 
 <script>
     let bookings = JSON.parse(localStorage.getItem('hotelBookings')) || [];
-    let config = JSON.parse(localStorage.getItem('hotelConfig')) || { rooms: ['101', '102', '103'], path: '' };
+    let config = JSON.parse(localStorage.getItem('hotelConfig')) || { rooms: ['1', '2', '3', '4', '5'], path: '' };
     let viewDate = new Date();
     viewDate.setDate(viewDate.getDate() - (viewDate.getDay() === 0 ? 6 : viewDate.getDay() - 1));
     let activeId = null;
@@ -144,7 +141,7 @@
         if(t === 'vacancy') updateVacancy();
     }
 
-    /* Core Rendering Engine */
+    /* Rendering Logic */
     function updateUI() {
         const days = [];
         for(let i=0; i<7; i++) { let d = new Date(viewDate); d.setDate(d.getDate() + i); days.push(d); }
@@ -156,28 +153,28 @@
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
 
-        config.rooms.forEach(room => {
+        // FIX: Loop through EVERY room in settings, not just rooms with bookings
+        config.rooms.forEach(roomNum => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td class="room-label" onclick="openWithRoom('${room}')">${room}</td>`;
+            tr.innerHTML = `<td class="room-label" onclick="openWithRoom('${roomNum}')">${roomNum}</td>`;
             
             days.forEach(day => {
                 const td = document.createElement('td');
                 const ds = day.toISOString().split('T')[0];
                 
-                // STACKING LOGIC: Find all matches for this day and room
-                const dailyMatches = bookings.filter(b => b.room === room && ds >= b.in && ds <= b.out);
+                // DATA STACKING: Render multiple bookings in one cell if needed
+                const dailyMatches = bookings.filter(b => String(b.room) === String(roomNum) && ds >= b.in && ds <= b.out);
                 
                 if(dailyMatches.length > 0) {
                     dailyMatches.forEach(m => {
                         const status = (ds === m.in) ? 'check-in' : (ds === m.out ? 'check-out' : 'occupied');
                         const isLate = status === 'check-out' && m.outTime > '11:00';
                         
-                        // Rule: Check for overlap with a check-in today
-                        const nextGuestInToday = bookings.find(b => b.room === room && b.id !== m.id && b.in === ds);
-                        const isExtensionBlocked = (status === 'check-out' && nextGuestInToday);
+                        // Overlap Logic: Conflict with same-day check-in
+                        const nextGuestInToday = bookings.find(b => String(b.room) === String(roomNum) && b.id !== m.id && b.in === ds);
 
                         const div = document.createElement('div');
-                        div.className = `guest-entry ${isLate ? 'late-alert' : ''} ${isExtensionBlocked ? 'extension-blocked' : ''}`;
+                        div.className = `guest-entry ${isLate ? 'late-alert' : ''}`;
                         div.onclick = (e) => { e.stopPropagation(); editBooking(m.id); };
                         
                         const names = m.gs.filter(g => g).join('<br>');
@@ -185,18 +182,17 @@
                             <div class="status-cell status-${status}">${status.toUpperCase()}</div>
                             <span class="guest-names">${names}</span>
                             ${m.cp ? `<span class="company-name">${m.cp}</span>` : ''}
-                            ${isExtensionBlocked ? `<div class="overlap-warning">⚠️ Checkout extension blocked (New In: ${nextGuestInToday.inTime})</div>` : ''}
+                            ${(status === 'check-out' && nextGuestInToday) ? `<div class="overlap-warning">⚠️ Extension blocked (New In: ${nextGuestInToday.inTime})</div>` : ''}
                             <div class="tooltip">
                                 <b>Guests:</b> ${m.gs.filter(g=>g).join(', ')}<br>
-                                <b>In/Out:</b> ${m.inTime} - ${m.outTime}<br>
-                                <b>Note:</b> ${m.cm || '-'}<br>
-                                ${isExtensionBlocked ? '<b style="color:#ef4444;">⛔ EXTENSION FORBIDDEN</b>' : ''}
+                                <b>Time:</b> ${m.inTime} - ${m.outTime}<br>
+                                <b>Notes:</b> ${m.cm || '-'}
                             </div>
                         `;
                         td.appendChild(div);
                     });
                 } else {
-                    td.onclick = () => openWithRoom(room, ds);
+                    td.onclick = () => openWithRoom(roomNum, ds);
                     td.innerText = '-';
                 }
                 tr.appendChild(td);
@@ -232,53 +228,47 @@
         closeModal(); updateUI();
     }
 
-    /* Editing Restrictions */
+    /* Helpers */
     function editBooking(id) {
         const b = bookings.find(item => item.id == id);
         activeId = id;
-        
-        // Logical Check: If someone is checking in on this person's checkout date, block date change
-        const conflict = bookings.find(x => x.room === b.room && x.id !== b.id && x.in === b.out);
+        const conflict = bookings.find(x => String(x.room) === String(b.room) && x.id !== b.id && x.in === b.out);
 
         document.getElementById('modalTitle').innerText = "Edit Booking";
         document.getElementById('deleteBtn').style.display = 'block';
         document.getElementById('formRoom').value = b.room;
         document.getElementById('formCompany').value = b.cp || '';
-        document.getElementById('g1').value = b.gs[0]; 
-        document.getElementById('g2').value = b.gs[1] || ''; 
-        document.getElementById('g3').value = b.gs[2] || '';
-        document.getElementById('formIn').value = b.in; 
-        document.getElementById('formInTime').value = b.inTime;
-        document.getElementById('formOut').value = b.out; 
-        document.getElementById('formOutTime').value = b.outTime;
+        document.getElementById('g1').value = b.gs[0]; document.getElementById('g2').value = b.gs[1] || ''; document.getElementById('g3').value = b.gs[2] || '';
+        document.getElementById('formIn').value = b.in; document.getElementById('formInTime').value = b.inTime;
+        document.getElementById('formOut').value = b.out; document.getElementById('formOutTime').value = b.outTime;
         document.getElementById('formComments').value = b.cm || '';
 
-        // Apply Restrictions
-        const isCompany = b.cp && b.cp.trim() !== "";
-        document.getElementById('formOut').disabled = (conflict && !isCompany);
-        
-        if (conflict) {
-            document.getElementById('formComments').value += "\n(Note: Checkout extension blocked due to next guest)";
-        }
-
+        // Same-day restriction logic
+        document.getElementById('formOut').disabled = (conflict && (!b.cp || b.cp.trim() === ""));
         document.getElementById('modal').classList.add('active');
     }
 
-    /* Helpers */
     function openWithRoom(r, d) { openModal(); document.getElementById('formRoom').value = r; document.getElementById('formIn').value = d; document.getElementById('formOut').value = d; }
     function openModal() { activeId = null; document.getElementById('deleteBtn').style.display = 'none'; document.querySelectorAll('#modal input, #modal textarea').forEach(i => { i.disabled = false; i.value = (i.id.includes('Time') ? (i.id.includes('In') ? '12:00' : '11:00') : ''); }); document.getElementById('modal').classList.add('active'); }
     function closeModal() { document.getElementById('modal').classList.remove('active'); }
     function changeWeek(o) { viewDate.setDate(viewDate.getDate() + o); updateUI(); }
     function deleteBooking() { if(confirm("Delete?")) { bookings = bookings.filter(b => b.id != activeId); localStorage.setItem('hotelBookings', JSON.stringify(bookings)); closeModal(); updateUI(); } }
-    function saveSettings() { config.rooms = document.getElementById('roomNumbersInput').value.split(',').map(s => s.trim()).filter(s => s); config.path = document.getElementById('backupPathInput').value; localStorage.setItem('hotelConfig', JSON.stringify(config)); updateUI(); alert("Saved!"); }
     
+    function saveSettings() {
+        const input = document.getElementById('roomNumbersInput').value;
+        config.rooms = input.split(',').map(s => s.trim()).filter(s => s);
+        config.path = document.getElementById('backupPathInput').value;
+        localStorage.setItem('hotelConfig', JSON.stringify(config));
+        updateUI(); alert("Rooms updated!");
+    }
+
     function updateVacancy() {
         const vInput = document.getElementById('vacancyDate');
         if(!vInput.value) vInput.value = new Date().toISOString().split('T')[0];
         const val = vInput.value;
         let occCount = 0;
         document.getElementById('vacantRoomsGrid').innerHTML = config.rooms.map(r => {
-            const isOcc = bookings.some(b => b.room === r && val >= b.in && val <= b.out);
+            const isOcc = bookings.some(b => String(b.room) === String(r) && val >= b.in && val <= b.out);
             if(isOcc) occCount++;
             return `<div style="padding:15px; border:2px solid ${isOcc ? '#ef4444' : '#10b981'}; border-radius:8px; text-align:center; font-weight:bold; background:white; color:${isOcc ? '#ef4444' : '#10b981'}">${r}</div>`;
         }).join('');
@@ -292,7 +282,7 @@
         const a = document.createElement('a');
         a.href = "data:text/json;charset=utf-8," + encodeURIComponent(data);
         a.download = 'hotel_backup.xls'; a.click();
-        alert(`Saved! Move file to: ${config.path || 'Downloads'}`);
+        alert(`Backup saved. Move to: ${config.path || 'Downloads'}`);
     }
 
     function importData(e) {
@@ -310,7 +300,7 @@
     function captureScreen() {
         const id = activeTab === 'tracker' ? 'trackerCaptureArea' : 'vacancyCaptureArea';
         html2canvas(document.getElementById(id), { backgroundColor: "#f3f4f6" }).then(canvas => {
-            let l = document.createElement('a'); l.download = `Hotel_Capture.png`; l.href = canvas.toDataURL(); l.click();
+            let l = document.createElement('a'); l.download = `Hotel_Report.png`; l.href = canvas.toDataURL(); l.click();
         });
     }
 
