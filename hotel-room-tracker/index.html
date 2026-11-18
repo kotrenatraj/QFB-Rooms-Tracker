@@ -302,6 +302,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     <div class="listhead"><h2 id="listTitle">Bookings</h2><button class="btn small" id="shareBtn" data-action="share">Share</button></div>
     <div class="seg" id="listSeg" style="margin-top:8px"></div>
     <div class="list" id="bookingList"></div>
+    <div id="listMore" style="margin-top:10px"></div>
   </section>
 
   <section id="tab-vacancy" hidden>
@@ -435,6 +436,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     pendingImport: null,
     shareScope: 'week',
     listScope: 'week',
+    pastLimit: 20,
     shareMsg: ''
   };
   var downloads = null;
@@ -628,18 +630,30 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var t = ymd(new Date());
     var list = state.bookings.filter(function (b) {
       if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return false;
-      return state.listScope === 'all' || inWeek(b);
+      if (state.listScope === 'upcoming') return b.checkOut >= t;
+      if (state.listScope === 'past') return b.checkOut < t;
+      return inWeek(b);
     }).sort(function (a, b) {
       var pa = a.checkOut < t, pb = b.checkOut < t;
       if (pa !== pb) return pa ? 1 : -1;
       if (pa) return a.checkOut < b.checkOut ? 1 : -1;
       return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber));
     });
-    $('listSeg').innerHTML = '<button class="btn small' + (state.listScope === 'week' ? ' on' : '') + '" data-action="listScope" data-v="week">' + esc(weekRangeText()) + '</button>' +
-      '<button class="btn small' + (state.listScope === 'all' ? ' on' : '') + '" data-action="listScope" data-v="all">All dates</button>';
-    $('listTitle').textContent = 'Bookings (' + list.length + ')';
+    var nUp = 0, nPast = 0;
+    state.bookings.forEach(function (b) {
+      if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return;
+      if (b.checkOut >= t) nUp += 1; else nPast += 1;
+    });
+    var total = list.length;
+    if (state.listScope === 'past') list = list.slice(0, state.pastLimit);
+    $('listMore').innerHTML = state.listScope === 'past' && total > list.length
+      ? '<button class="btn" style="width:100%" data-action="pastMore">Show ' + Math.min(20, total - list.length) + ' more (' + (total - list.length) + ' older)</button>' : '';
+    $('listSeg').innerHTML = [['week', weekRangeText()], ['upcoming', 'Upcoming (' + nUp + ')'], ['past', 'Past (' + nPast + ')']].map(function (x) {
+      return '<button class="btn small' + (state.listScope === x[0] ? ' on' : '') + '" data-action="listScope" data-v="' + x[0] + '">' + esc(x[1]) + '</button>';
+    }).join('');
+    $('listTitle').textContent = 'Bookings (' + total + ')';
     if (!list.length) {
-      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">' + (!state.bookings.length ? 'No bookings yet. Tap + to add the first one.' : (state.listScope === 'week' ? 'No bookings in this week.' : 'No bookings for this room.')) + '</div>';
+      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">' + (!state.bookings.length ? 'No bookings yet. Tap + to add the first one.' : ({ week: 'No bookings in this week.', upcoming: 'No upcoming bookings.', past: 'No past bookings.' }[state.listScope])) + '</div>';
       return;
     }
     $('bookingList').innerHTML = list.map(function (b) {
@@ -974,7 +988,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'checkin': setCheckin(id, true); break;
       case 'undoCheckin': setCheckin(id, false); break;
       case 'share': openShare(); break;
-      case 'listScope': state.listScope = el.getAttribute('data-v'); renderList(); break;
+      case 'listScope': state.listScope = el.getAttribute('data-v'); state.pastLimit = 20; renderList(); break;
+      case 'pastMore': state.pastLimit += 20; renderList(); break;
       case 'shareScope': state.shareScope = el.getAttribute('data-v'); renderShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
       case 'saveSettings': saveSettings(); break;

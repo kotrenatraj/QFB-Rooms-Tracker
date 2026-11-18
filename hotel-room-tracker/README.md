@@ -7,7 +7,7 @@ A single-page, mobile-first tracker for hotel room check-ins and check-outs. No 
 - **Weekly grid**: dates and days across the top, one row per room. Cells show check-in, check-out, staying, vacant, or a same-day check-out and check-in.
 - **Guest and company**: each booking has a guest name and an optional company name. The company shows as a coloured-initials thumbnail and label.
 - **Share bookings**: the Share button on the Bookings list builds a short summary (arrivals, departures, and each booking with guest, company, dates and status). Copy it and paste it into any chat or email. Choose current and upcoming bookings or all.
-- **Week-aware bookings list**: the Bookings list follows the week shown in the grid (a stay that spans two weeks appears in both). Switch to All dates to see everything. Share defaults to the week shown.
+- **Week-aware bookings list**: the Bookings list follows the week shown in the grid (a stay that spans two weeks appears in both). Two other views keep it tidy: **Upcoming** (today and later) and **Past**, which loads 20 at a time. Share defaults to the week shown.
 - **One-tap check-in**: on the day of arrival, tap Check in on the booking (or in the day sheet). The time is recorded, the label changes from Arriving today to Checked in, and the week grid shows a tick. Undo is one tap away. The check-in time is included in the Excel export and import.
 - **Fast entry**: tap a vacant cell to book it, tap a booked cell to see or edit the stay. Quick "nights" buttons set the check-out date.
 - **Double-booking guard**: overlapping stays for the same room are blocked. Back-to-back stays are allowed.
