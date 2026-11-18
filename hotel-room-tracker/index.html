@@ -428,7 +428,6 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     vacDate: ymd(new Date()),
     confirmDelete: null,
     pendingImport: null,
-    shareScope: 'week',
     shareMsg: ''
   };
   var downloads = null;
@@ -964,7 +963,6 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'checkin': setCheckin(id, true); break;
       case 'undoCheckin': setCheckin(id, false); break;
       case 'share': openShare(); break;
-      case 'shareScope': state.shareScope = el.getAttribute('data-v'); renderShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
       case 'saveSettings': saveSettings(); break;
       case 'export': doExport(); break;
@@ -1066,7 +1064,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
     var arrIn = list.filter(function (b) { return b.checkIn === t && b.checkedInAt; }).length;
     var dep = list.filter(function (b) { return b.checkOut === t; }).length;
-    var lines = ['Hotel bookings' + (state.shareScope === 'week' ? ' for ' + weekRangeText() : '') + ' as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
+    var lines = ['Hotel bookings' + ' for ' + weekRangeText() + ' as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
       'Arriving today: ' + arr + (arr ? ' (' + arrIn + ' checked in)' : '') + ' | Leaving today: ' + dep + ' | Bookings: ' + list.length, ''];
     list.forEach(function (b) {
       lines.push('Room ' + b.roomNumber + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''));
@@ -1091,14 +1089,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('sheetOverlay').hidden = false;
   }
   function renderShare() {
-    var scope = state.shareScope, list = shareList(scope);
-    var nWeek = shareList('week').length, nCur = shareList('current').length, nAll = shareList('all').length;
+    var list = shareList('week');
     state.shareMsg = buildMessage(list);
     $('sheetBody').innerHTML =
-      '<div class="fg"><div class="lbl">What to include' + (state.filter !== 'all' ? ' (Room ' + esc(state.filter) + ' only)' : '') + '</div><div class="seg">' +
-      '<button class="btn small' + (scope === 'week' ? ' on' : '') + '" data-action="shareScope" data-v="week">Week shown: ' + esc(weekRangeText()) + ' (' + nWeek + ')</button>' +
-      '<button class="btn small' + (scope === 'current' ? ' on' : '') + '" data-action="shareScope" data-v="current">Current and upcoming (' + nCur + ')</button>' +
-      '<button class="btn small' + (scope === 'all' ? ' on' : '') + '" data-action="shareScope" data-v="all">All (' + nAll + ')</button></div></div>' +
+      '<div class="fg"><div class="lbl">Bookings for ' + esc(weekRangeText()) + ' (' + list.length + ')' + (state.filter !== 'all' ? ' \u00b7 Room ' + esc(state.filter) + ' only' : '') + '</div></div>' +
       '<div class="fg"><label class="lbl" for="shareText">Summary</label><textarea class="field" id="shareText" readonly></textarea></div>' +
       (list.length ? '<div class="sharebtns"><button class="btn primary" data-action="shareCopyMsg">Copy message</button></div>'
                    : '<p class="hint">Nothing to share for this selection.</p>');
