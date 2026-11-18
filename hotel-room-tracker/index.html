@@ -1,10 +1,7 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e6b66">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0f766e">
 <title>Hotel Room Tracker</title>
+
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
 /* Layout: a ledger-style week grid (days across the top, rooms down the side). On phones the tabs move to a bottom bar and the grid fits the screen. */
@@ -255,9 +252,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
 @media (min-width: 641px) { .tip { display: none; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>body{margin:0}</style>
-</head>
-<body>
+
+<style>body{margin:0}</style></head><body>
 <div class="app">
   <div class="top">
     <h1>Hotel Room Tracker</h1>
@@ -301,6 +297,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     <p class="tip">Tap a cell to book or edit. Swipe the grid to change week.</p>
     <div class="listhead"><h2 id="listTitle">Bookings</h2><button class="btn small" id="shareBtn" data-action="share">Share</button></div>
     <div class="seg" id="listSeg" style="margin-top:8px"></div>
+    <div class="hint" id="listHint"></div>
     <div class="list" id="bookingList"></div>
     <div id="listMore" style="margin-top:10px"></div>
   </section>
@@ -630,30 +627,34 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var t = ymd(new Date());
     var list = state.bookings.filter(function (b) {
       if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return false;
-      if (state.listScope === 'upcoming') return b.checkOut >= t;
-      if (state.listScope === 'past') return b.checkOut < t;
+      var ws = ymd(state.weekStart), we = ymd(addDays(state.weekStart, 6));
+      if (state.listScope === 'later') return b.checkIn > we;
+      if (state.listScope === 'earlier') return b.checkOut < ws;
       return inWeek(b);
     }).sort(function (a, b) {
+      if (state.listScope === 'earlier') return a.checkOut < b.checkOut ? 1 : (a.checkOut > b.checkOut ? -1 : cmpRoom(a.roomNumber, b.roomNumber));
+      if (state.listScope === 'later') return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber));
       var pa = a.checkOut < t, pb = b.checkOut < t;
       if (pa !== pb) return pa ? 1 : -1;
       if (pa) return a.checkOut < b.checkOut ? 1 : -1;
       return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber));
     });
-    var nUp = 0, nPast = 0;
+    var wsS = ymd(state.weekStart), weS = ymd(addDays(state.weekStart, 6)), nEarlier = 0, nLater = 0;
     state.bookings.forEach(function (b) {
       if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return;
-      if (b.checkOut >= t) nUp += 1; else nPast += 1;
+      if (b.checkIn > weS) nLater += 1; else if (b.checkOut < wsS) nEarlier += 1;
     });
     var total = list.length;
-    if (state.listScope === 'past') list = list.slice(0, state.pastLimit);
-    $('listMore').innerHTML = state.listScope === 'past' && total > list.length
-      ? '<button class="btn" style="width:100%" data-action="pastMore">Show ' + Math.min(20, total - list.length) + ' more (' + (total - list.length) + ' older)</button>' : '';
-    $('listSeg').innerHTML = [['week', weekRangeText()], ['upcoming', 'Upcoming (' + nUp + ')'], ['past', 'Past (' + nPast + ')']].map(function (x) {
+    if (state.listScope !== 'week') list = list.slice(0, state.pastLimit);
+    $('listMore').innerHTML = state.listScope !== 'week' && total > list.length
+      ? '<button class="btn" style="width:100%" data-action="pastMore">Show ' + Math.min(20, total - list.length) + ' more (' + (total - list.length) + ' left)</button>' : '';
+    $('listSeg').innerHTML = [['week', weekRangeText()], ['earlier', 'Earlier (' + nEarlier + ')'], ['later', 'Later (' + nLater + ')']].map(function (x) {
       return '<button class="btn small' + (state.listScope === x[0] ? ' on' : '') + '" data-action="listScope" data-v="' + x[0] + '">' + esc(x[1]) + '</button>';
     }).join('');
     $('listTitle').textContent = 'Bookings (' + total + ')';
+    $('listHint').textContent = 'Earlier: ended before ' + fmtDay(state.weekStart) + '. Later: starts after ' + fmtDay(addDays(state.weekStart, 6)) + '.';
     if (!list.length) {
-      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">' + (!state.bookings.length ? 'No bookings yet. Tap + to add the first one.' : ({ week: 'No bookings in this week.', upcoming: 'No upcoming bookings.', past: 'No past bookings.' }[state.listScope])) + '</div>';
+      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">' + (!state.bookings.length ? 'No bookings yet. Tap + to add the first one.' : ({ week: 'No bookings in this week.', earlier: 'No earlier bookings.', later: 'No later bookings.' }[state.listScope])) + '</div>';
       return;
     }
     $('bookingList').innerHTML = list.map(function (b) {
@@ -1140,5 +1141,5 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 })();
 </script>
-</body>
-</html>
+
+</body></html>
