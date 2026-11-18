@@ -117,6 +117,9 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .cell { width: 100%; border: 0; border-radius: 6px; padding: 6px 4px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; }
 .cell .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
 .cell .who { font-size: 11px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell .co { font-size: 10px; font-style: italic; opacity: 0.85; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logo { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; font-size: 11px; font-weight: 700; flex: none; letter-spacing: 0.02em; }
+.co-line { color: var(--muted); font-size: 13px; margin-top: 1px; overflow-wrap: anywhere; }
 .cell.in { background: var(--in-bg); color: var(--in); }
 .cell.out { background: var(--out-bg); color: var(--out); }
 .cell.stay { background: var(--stay-bg); color: var(--stay); }
@@ -225,6 +228,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
   .cell { min-height: 54px; padding: 4px 1px; border-radius: 5px; }
   .cell .tag { font-size: 10px; letter-spacing: 0; }
   .cell .who { font-size: 9px; }
+  .cell .co { font-size: 8.5px; }
   .tip { display: block; }
 
   .list { grid-template-columns: 1fr; }
@@ -364,6 +368,11 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
         <input class="field" type="text" id="fGuest" autocomplete="off" autocapitalize="words" placeholder="Guest name">
       </div>
       <div class="fg">
+        <label class="lbl" for="fCompany">Company name <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input class="field" type="text" id="fCompany" list="companyOptions" autocomplete="off" autocapitalize="words" placeholder="Company name">
+        <datalist id="companyOptions"></datalist>
+      </div>
+      <div class="fg">
         <label class="lbl" for="fIn">Check-in date</label>
         <input class="field" type="date" id="fIn">
       </div>
@@ -438,6 +447,17 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
   function nights(b) { return Math.round((parseYmd(b.checkOut) - parseYmd(b.checkIn)) / 86400000); }
   function cmpRoom(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }
   function newId() { idSeq += 1; return Date.now() * 100 + (idSeq % 100); }
+  function hueOf(s) { var h = 0, i; for (i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
+  function initials(s) {
+    var w = s.trim().split(/\s+/).filter(Boolean);
+    return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[1].charAt(0) : '')).toUpperCase();
+  }
+  /* company thumbnail: coloured initials, colour fixed by the company name, readable in light and dark */
+  function logoHtml(name) {
+    if (!name) return '';
+    var h = hueOf(name.toLowerCase());
+    return '<span class="logo" title="' + esc(name) + '" style="background:color-mix(in srgb, hsl(' + h + ' 70% 50%) 22%, var(--surface));color:color-mix(in srgb, hsl(' + h + ' 70% 45%) 55%, var(--fg))">' + esc(initials(name)) + '</span>';
+  }
 
   /* ---------- storage (per device, may be unavailable) ---------- */
   function load() {
@@ -558,7 +578,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     }
     var b = bs[0], st = statusOf(b, day);
     return '<button class="cell ' + st.cls + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + st.label + ', ' + esc(b.guestName) + '">' +
-      '<span class="tag">' + st.tag + '</span><span class="who">' + esc(b.guestName) + '</span></button>';
+      '<span class="tag">' + st.tag + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
   }
 
   function renderGrid() {
@@ -606,8 +626,8 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     }
     $('bookingList').innerHTML = list.map(function (b) {
       var asking = state.confirmDelete === b.id, past = b.checkOut < t;
-      return '<div class="card bk' + (past ? ' past' : '') + '"><div style="min-width:0"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
-        '<div class="guest">' + esc(b.guestName) + '</div>' +
+      return '<div class="card bk' + (past ? ' past' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
+        '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
         '<div class="dates">' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + ' &middot; ' + nights(b) + ' night' + (nights(b) === 1 ? '' : 's') + '</div></div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
@@ -635,7 +655,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     $('vacantNote').textContent = vacant.length ? 'Vacant on ' + fmt(d) + ': ' + vacant.join(', ') : '';
     $('occChips').innerHTML = occupied.length ? occupied.map(function (r) {
       var b = occ[r], tag = b.checkIn === d ? 'Arriving' : 'Staying';
-      return '<div class="chip occ"><b>' + esc(r) + '</b><small title="' + esc(b.guestName) + '">' + esc(b.guestName) + '</small><small>' + tag + '</small></div>';
+      return '<div class="chip occ"><b>' + esc(r) + '</b><small title="' + esc(b.guestName) + '">' + esc(b.guestName) + '</small>' + (b.company ? '<small title="' + esc(b.company) + '">' + esc(b.company) + '</small>' : '') + '<small>' + tag + '</small></div>';
     }).join('') : '<div class="empty" style="grid-column:1/-1;padding:8px">No occupied rooms on this date.</div>';
     $('outsideNote').textContent = outside ? outside + ' booking(s) on this date are for room numbers that are not in your room list (see Settings).' : '';
   }
@@ -662,7 +682,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     $('sheetTitle').textContent = 'Room ' + room + ' · ' + fmtLong(day);
     $('sheetBody').innerHTML = bs.map(function (b) {
       var st = statusOf(b, day);
-      return '<div class="sheetrow"><div style="min-width:0"><div class="g">' + esc(b.guestName) + '</div>' +
+      return '<div class="sheetrow">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') +
         '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + '</div></div>' +
         '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div>';
     }).join('') + (free
@@ -682,9 +702,15 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     var ci = b ? b.checkIn : (preset && preset.checkIn) || (state.tab === 'vacancy' ? state.vacDate : ymd(new Date()));
     $('fRoom').value = b ? b.roomNumber : (preset && preset.room) || (state.filter !== 'all' ? state.filter : '');
     $('fGuest').value = b ? b.guestName : '';
+    $('fCompany').value = b ? (b.company || '') : '';
     $('fIn').value = ci;
     $('fOut').value = b ? b.checkOut : ymd(addDays(parseYmd(ci), 1));
     $('roomOptions').innerHTML = allRooms().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
+    var seenCo = {};
+    $('companyOptions').innerHTML = state.bookings.map(function (x) { return x.company || ''; }).filter(function (c) {
+      if (!c || seenCo[c.toLowerCase()]) return false;
+      seenCo[c.toLowerCase()] = true; return true;
+    }).sort().map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
     formError('');
     $('overlay').hidden = false;
     setTimeout(function () { ($('fRoom').value ? $('fGuest') : $('fRoom')).focus(); }, 0);
@@ -697,7 +723,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
   }
   function submitBooking(ev) {
     ev.preventDefault();
-    var room = $('fRoom').value.trim(), guest = $('fGuest').value.trim(), ci = $('fIn').value, co = $('fOut').value;
+    var room = $('fRoom').value.trim(), guest = $('fGuest').value.trim(), company = $('fCompany').value.trim(), ci = $('fIn').value, co = $('fOut').value;
     if (!room || !guest || !ci || !co) return formError('Fill in the room, guest name and both dates.');
     if (co <= ci) return formError('Check-out must be after check-in.');
     var clash = null;
@@ -711,11 +737,11 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     }
     if (state.editId) {
       state.bookings = state.bookings.map(function (b) {
-        return b.id === state.editId ? { id: b.id, roomNumber: room, guestName: guest, checkIn: ci, checkOut: co } : b;
+        return b.id === state.editId ? { id: b.id, roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co } : b;
       });
       toast('Booking updated.');
     } else {
-      state.bookings.push({ id: newId(), roomNumber: room, guestName: guest, checkIn: ci, checkOut: co });
+      state.bookings.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co });
       toast('Booking added to room ' + room + '.');
     }
     persist();
@@ -743,10 +769,10 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
     var sorted = state.bookings.slice().sort(function (a, b) {
       return cmpRoom(a.roomNumber, b.roomNumber) || (a.checkIn < b.checkIn ? -1 : 1);
     });
-    var rows = [['Room', 'Guest', 'Check-in', 'Check-out', 'Nights']];
-    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.checkIn, b.checkOut, nights(b)]); });
+    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights']];
+    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b)]); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 13 }, { wch: 13 }, { wch: 8 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
 
     var days = [];
@@ -758,7 +784,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
       occ.push([room].concat(days.map(function (d) {
         var day = ymd(d), bs = bookingsOn(room, day);
         if (!bs.length) return '-';
-        return bs.map(function (b) { return statusOf(b, day).tag + ' - ' + b.guestName; }).join(' / ');
+        return bs.map(function (b) { return statusOf(b, day).tag + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''); }).join(' / ');
       })));
     });
     var ws2 = XLSX.utils.aoa_to_sheet(occ);
@@ -822,18 +848,31 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
         var wb = XLSX.read(r.result, { type: 'array', cellDates: true });
         var name = wb.SheetNames.indexOf('Bookings') >= 0 ? 'Bookings' : wb.SheetNames[0];
         var rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
-        var start = 1, i;
+        var start = 1, i, hdr = null;
         for (i = 0; i < rows.length; i++) {
-          if (String(rows[i][0]).trim().toLowerCase() === 'room') { start = i + 1; break; }
+          if (String(rows[i][0]).trim().toLowerCase() === 'room') {
+            start = i + 1;
+            hdr = rows[i].map(function (h) { return String(h).trim().toLowerCase(); });
+            break;
+          }
+        }
+        /* columns by header name, so files exported before Company existed still import */
+        var cG = 1, cC = -1, cI = 2, cO = 3;
+        if (hdr) {
+          if (hdr.indexOf('guest') >= 0) cG = hdr.indexOf('guest');
+          cC = hdr.indexOf('company');
+          if (hdr.indexOf('check-in') >= 0) cI = hdr.indexOf('check-in');
+          if (hdr.indexOf('check-out') >= 0) cO = hdr.indexOf('check-out');
         }
         var out = [], skipped = 0;
         for (i = start; i < rows.length; i++) {
           var row = rows[i];
-          var room = String(row[0]).trim(), guest = String(row[1]).trim();
-          if (!room && !guest && !row[2] && !row[3]) continue;
-          var ci = toYmd(row[2]), co = toYmd(row[3]);
+          var room = String(row[0]).trim(), guest = String(row[cG] == null ? '' : row[cG]).trim();
+          var company = cC >= 0 ? String(row[cC] == null ? '' : row[cC]).trim() : '';
+          if (!room && !guest && !row[cI] && !row[cO]) continue;
+          var ci = toYmd(row[cI]), co = toYmd(row[cO]);
           if (!room || !guest || !ci || !co || co <= ci) { skipped += 1; continue; }
-          out.push({ id: newId(), roomNumber: room, guestName: guest, checkIn: ci, checkOut: co });
+          out.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co });
         }
         var settings = null;
         if (wb.Sheets['Settings']) {
