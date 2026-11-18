@@ -199,15 +199,9 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
 .listhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .seg .btn.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.sharebtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.sharebtns .btn { flex: 1 1 130px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-#shareText { font-size: 13px; line-height: 1.45; min-height: 190px; resize: vertical; }
-#shareLink { font-size: 12px; }
-/* read-only view opened from a share link: bookings only, no editing controls */
-body.viewmode .tabs, body.viewmode .fab, body.viewmode .weeknav, body.viewmode #gridWrap, body.viewmode .legend,
-body.viewmode .tip, body.viewmode .toolbar.filters .btn, body.viewmode #shareBtn { display: none !important; }
-body.viewmode { padding-bottom: 32px; }
-body.viewmode .toolbar.filters { display: block; }
+.sharebtns { margin-top: 12px; }
+.sharebtns .btn { width: 100%; }
+#shareText { font-size: 13px; line-height: 1.45; min-height: 220px; resize: vertical; }
 
 /* ---------- phones ---------- */
 @media (max-width: 640px) {
@@ -264,7 +258,7 @@ body.viewmode .toolbar.filters { display: block; }
 <div class="app">
   <div class="top">
     <h1>Hotel Room Tracker</h1>
-    <p class="sub" id="topSub">Check-ins, check-outs and vacant rooms, week by week.</p>
+    <p class="sub">Check-ins, check-outs and vacant rooms, week by week.</p>
   </div>
 
   <div class="tabs" role="tablist">
@@ -435,10 +429,7 @@ body.viewmode .toolbar.filters { display: block; }
     vacDate: ymd(new Date()),
     confirmDelete: null,
     pendingImport: null,
-    readonly: false,
-    sharedAt: 0,
     shareScope: 'current',
-    shareLink: '',
     shareMsg: ''
   };
   var downloads = null;
@@ -493,7 +484,6 @@ body.viewmode .toolbar.filters { display: block; }
     } catch (e) {}
   }
   function persist() {
-    if (state.readonly) return;
     try {
       localStorage.setItem(KEY_B, JSON.stringify(state.bookings));
       localStorage.setItem(KEY_S, JSON.stringify(state.settings));
@@ -509,7 +499,7 @@ body.viewmode .toolbar.filters { display: block; }
   }
   function allRooms() {
     var seen = {}, out = [];
-    (state.readonly ? [] : configuredRooms()).concat(state.bookings.map(function (b) { return String(b.roomNumber); })).forEach(function (r) {
+    configuredRooms().concat(state.bookings.map(function (b) { return String(b.roomNumber); })).forEach(function (r) {
       if (!seen[r]) { seen[r] = true; out.push(r); }
     });
     return out.sort(cmpRoom);
@@ -546,20 +536,13 @@ body.viewmode .toolbar.filters { display: block; }
   /* ---------- rendering ---------- */
   function render() {
     renderBanner();
-    $('fab').hidden = state.readonly || state.tab === 'settings';
+    $('fab').hidden = state.tab === 'settings';
     if (state.tab === 'tracker') { renderToday(); renderFilter(); renderGrid(); renderList(); }
     if (state.tab === 'vacancy') renderVacancy();
   }
 
   function renderBanner() {
     var p = state.pendingImport, el = $('importBanner');
-    if (state.readonly) {
-      var when = state.sharedAt ? new Date(state.sharedAt) : null;
-      el.innerHTML = '<div class="card banner"><div class="msg"><b>Shared view, read-only</b><br>' +
-        (when ? 'Updated ' + esc(when.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + when.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })) + ' (' + ago(state.sharedAt) + '). ' : '') +
-        'This is a snapshot. Ask for a fresh link to see later changes.</div></div>';
-      return;
-    }
     if (!p) { el.innerHTML = ''; return; }
     el.innerHTML = '<div class="card banner"><div class="msg"><b>Replace current data?</b><br>' +
       esc(p.name) + ' has ' + p.bookings.length + ' booking(s)' +
@@ -581,7 +564,7 @@ body.viewmode .toolbar.filters { display: block; }
     $('todayStrip').innerHTML =
       '<div class="pill in"><b>' + arr + '</b><span>Arriving today</span></div>' +
       '<div class="pill out"><b>' + dep + '</b><span>Leaving today</span></div>' +
-      (state.readonly ? '<div class="pill"><b>' + Object.keys(busy).length + '</b><span>In house</span></div>' : '<div class="pill"><b>' + vacant + '</b><span>Vacant tonight</span></div>');
+      '<div class="pill"><b>' + vacant + '</b><span>Vacant tonight</span></div>';
   }
 
   function renderFilter() {
@@ -656,10 +639,10 @@ body.viewmode .toolbar.filters { display: block; }
       return '<div class="card bk' + (past ? ' past' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
         '<div class="dates">' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + ' &middot; ' + nights(b) + ' night' + (nights(b) === 1 ? '' : 's') + '</div></div>' +
-        (state.readonly ? '' : '<div>' + (asking
+        '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
-          : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') + '</div>') +
-        '</div>';
+          : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
+        '</div></div>';
     }).join('');
   }
 
@@ -941,7 +924,6 @@ body.viewmode .toolbar.filters { display: block; }
     if (!el) return;
     var a = el.getAttribute('data-action'), id = +el.getAttribute('data-id');
     var room = el.getAttribute('data-room'), day = el.getAttribute('data-day');
-    if (state.readonly && ['edit', 'del', 'delYes', 'add', 'cell', 'chipBook', 'sheetEdit', 'sheetBook', 'import', 'export', 'saveSettings', 'tab', 'share'].indexOf(a) >= 0) return;
     switch (a) {
       case 'tab': switchTab(el.getAttribute('data-tab')); break;
       case 'prevWeek': state.weekStart = addDays(state.weekStart, -7); render(); break;
@@ -976,10 +958,6 @@ body.viewmode .toolbar.filters { display: block; }
       case 'share': openShare(); break;
       case 'shareScope': state.shareScope = el.getAttribute('data-v'); renderShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
-      case 'shareCopyLink': copyText(state.shareLink, 'Link copied.'); break;
-      case 'shareNative':
-        if (navigator.share) navigator.share({ title: 'Hotel bookings', text: state.shareMsg }).catch(function () {});
-        break;
       case 'saveSettings': saveSettings(); break;
       case 'export': doExport(); break;
       case 'import': $('importFile').click(); break;
@@ -1026,17 +1004,7 @@ body.viewmode .toolbar.filters { display: block; }
     }, { passive: true });
   })();
 
-  /* ---------- share bookings ---------- */
-  function inClaude() { return !!(window.claude && window.claude.use); }
-  function ago(ms) {
-    var m = Math.round((Date.now() - ms) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + ' min ago';
-    var h = Math.round(m / 60);
-    if (h < 24) return h + ' h ago';
-    var d = Math.round(h / 24);
-    return d + ' day' + (d === 1 ? '' : 's') + ' ago';
-  }
+  /* ---------- share bookings (summary text only) ---------- */
   function statusText(b, t) {
     if (b.checkIn === t) return 'Arriving today';
     if (b.checkOut === t) return 'Leaving today';
@@ -1051,7 +1019,7 @@ body.viewmode .toolbar.filters { display: block; }
       return scope === 'all' || b.checkOut >= t;
     }).sort(function (a, b) { return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber)); });
   }
-  function buildMessage(list, link) {
+  function buildMessage(list) {
     var now = new Date(), t = ymd(now);
     var stamp = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
@@ -1063,125 +1031,41 @@ body.viewmode .toolbar.filters { display: block; }
       lines.push('  ' + fmtDay(parseYmd(b.checkIn)) + ' to ' + fmtDay(parseYmd(b.checkOut)) + ', ' + nights(b) + (nights(b) === 1 ? ' night' : ' nights') + ' - ' + statusText(b, t));
     });
     if (!list.length) lines.push('No bookings to show.');
-    if (link) lines.push('', 'Read-only view (no edit access): ' + link);
     return lines.join('\n');
-  }
-  function toB64u(bytes) {
-    var s = '', i;
-    for (i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function fromB64u(str) {
-    str = str.replace(/-/g, '+').replace(/_/g, '/');
-    while (str.length % 4) str += '=';
-    var bin = atob(str), out = new Uint8Array(bin.length), i;
-    for (i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  }
-  function streamBytes(stream, bytes) {
-    var w = stream.writable.getWriter();
-    w.write(bytes).catch(function () {});
-    w.close().catch(function () {});
-    return new Response(stream.readable).arrayBuffer().then(function (b) { return new Uint8Array(b); });
-  }
-  function packPayload(obj) {
-    var bytes = new TextEncoder().encode(JSON.stringify(obj));
-    if (window.CompressionStream) {
-      try {
-        return streamBytes(new CompressionStream('deflate-raw'), bytes).then(
-          function (z) { return 'z' + toB64u(z); },
-          function () { return 'p' + toB64u(bytes); });
-      } catch (e) {}
-    }
-    return Promise.resolve('p' + toB64u(bytes));
-  }
-  function unpackPayload(str) {
-    var bytes = fromB64u(str.slice(1));
-    var p = str.charAt(0) === 'z' ? streamBytes(new DecompressionStream('deflate-raw'), bytes) : Promise.resolve(bytes);
-    return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
-  }
-  function makeLink(list) {
-    var obj = { v: 1, t: Date.now(), b: list.map(function (b) { return [String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut]; }) };
-    return packPayload(obj).then(function (p) { return location.href.split('#')[0] + '#view=' + p; });
   }
   function copyText(text, okMsg) {
     function fallback() {
-      var ta = document.createElement('textarea');
-      ta.value = text; ta.setAttribute('readonly', '');
-      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
-      document.body.appendChild(ta); ta.select();
+      var ta = $('shareText');
       var ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      toast(ok ? okMsg : 'Copy was blocked. Select the text and copy it by hand.');
+      if (ta) { ta.focus(); ta.select(); try { ok = document.execCommand('copy'); } catch (e) {} }
+      toast(ok ? okMsg : 'Copy was blocked. Select the message and copy it by hand.');
     }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fallback);
     else fallback();
   }
-  var shareSeq = 0;
   function openShare() {
     $('sheetTitle').textContent = 'Share bookings';
-    $('sheetBody').innerHTML = '<div class="empty">Preparing...</div>';
-    $('sheetOverlay').hidden = false;
     renderShare();
+    $('sheetOverlay').hidden = false;
   }
   function renderShare() {
-    var seq = ++shareSeq, scope = state.shareScope, list = shareList(scope);
+    var scope = state.shareScope, list = shareList(scope);
     var nCur = shareList('current').length, nAll = shareList('all').length;
-    var useLink = !inClaude() && list.length > 0;
-    (useLink ? makeLink(list) : Promise.resolve('')).then(function (link) {
-      if (seq !== shareSeq) return;
-      var msg = buildMessage(list, link);
-      state.shareLink = link; state.shareMsg = msg;
-      var note = !list.length ? 'Nothing to share for this selection.'
-        : link ? 'Anyone with the link sees these bookings only, with no Edit, Delete or Add. The link is a snapshot, so send a new one after bookings change. It contains guest names, so share it only with people who should see them.'
-        : 'Read-only links work when the tracker is opened from its own web address, such as GitHub Pages. Here you can send the message above.';
-      $('sheetBody').innerHTML =
-        '<div class="fg"><div class="lbl">What to share' + (state.filter !== 'all' ? ' (Room ' + esc(state.filter) + ' only)' : '') + '</div><div class="seg">' +
-        '<button class="btn small' + (scope === 'current' ? ' on' : '') + '" data-action="shareScope" data-v="current">Current and upcoming (' + nCur + ')</button>' +
-        '<button class="btn small' + (scope === 'all' ? ' on' : '') + '" data-action="shareScope" data-v="all">All (' + nAll + ')</button></div></div>' +
-        '<div class="fg"><label class="lbl" for="shareText">Message</label><textarea class="field" id="shareText" readonly></textarea></div>' +
-        (link ? '<div class="fg"><label class="lbl" for="shareLink">Read-only link</label><input class="field" id="shareLink" readonly></div>' : '') +
-        '<div class="sharebtns">' +
-        (list.length ? '<a class="btn primary" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msg) + '">WhatsApp</a>' +
-          '<button class="btn" data-action="shareCopyMsg">Copy message</button>' : '') +
-        (link ? '<button class="btn" data-action="shareCopyLink">Copy link</button>' : '') +
-        (list.length && navigator.share && !inClaude() ? '<button class="btn" data-action="shareNative">Share...</button>' : '') +
-        '</div><p class="hint" style="margin-top:12px">' + note + '</p>';
-      $('shareText').value = msg;
-      if (link) $('shareLink').value = link;
-    });
+    state.shareMsg = buildMessage(list);
+    $('sheetBody').innerHTML =
+      '<div class="fg"><div class="lbl">What to include' + (state.filter !== 'all' ? ' (Room ' + esc(state.filter) + ' only)' : '') + '</div><div class="seg">' +
+      '<button class="btn small' + (scope === 'current' ? ' on' : '') + '" data-action="shareScope" data-v="current">Current and upcoming (' + nCur + ')</button>' +
+      '<button class="btn small' + (scope === 'all' ? ' on' : '') + '" data-action="shareScope" data-v="all">All (' + nAll + ')</button></div></div>' +
+      '<div class="fg"><label class="lbl" for="shareText">Summary</label><textarea class="field" id="shareText" readonly></textarea></div>' +
+      (list.length ? '<div class="sharebtns"><button class="btn primary" data-action="shareCopyMsg">Copy message</button></div>'
+                   : '<p class="hint">Nothing to share for this selection.</p>');
+    $('shareText').value = state.shareMsg;
   }
-
-  /* ---------- read-only view (opened from a share link) ---------- */
-  function enterView(str) {
-    return unpackPayload(str).then(function (d) {
-      if (!d || !Array.isArray(d.b)) throw new Error('bad payload');
-      var re = /^\d{4}-\d{2}-\d{2}$/;
-      state.readonly = true;
-      state.sharedAt = +d.t || 0;
-      state.bookings = d.b.filter(function (r) { return Array.isArray(r) && re.test(String(r[3])) && re.test(String(r[4])); }).map(function (r, i) {
-        return { id: i + 1, roomNumber: String(r[0]), guestName: String(r[1]), company: String(r[2] || ''), checkIn: String(r[3]), checkOut: String(r[4]) };
-      });
-      document.body.classList.add('viewmode');
-      $('topSub').textContent = 'Bookings shared with you.';
-      render();
-    });
-  }
-  window.addEventListener('hashchange', function () { if (state.readonly || /^#view=/.test(location.hash)) location.reload(); });
 
   /* ---------- boot ---------- */
-  var vm = (location.hash || '').match(/^#view=([A-Za-z0-9_-]+)$/);
-  if (vm) {
-    enterView(vm[1]).catch(function () {
-      load(); renderSettings(); render();
-      toast('That share link could not be read. Ask for a new one.');
-    });
-  } else {
-    load();
-    renderSettings();
-    render();
-  }
+  load();
+  renderSettings();
+  render();
   if (window.claude && window.claude.use) {
     window.claude.use('downloads').then(function (d) { downloads = d; }).catch(function () {});
   }
