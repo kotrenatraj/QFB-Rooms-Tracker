@@ -195,6 +195,9 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 @media (prefers-reduced-motion: no-preference) { .toast { animation: rise 0.18s ease-out; } }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
+.ci-btn { margin-top: 8px; }
+.ci-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; color: var(--in); font-size: 12px; font-weight: 600; }
+.ci-line .btn { min-height: 28px; padding: 2px 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
 div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px; }
 .listhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -289,7 +292,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       </table>
     </div>
     <div class="legend">
-      <span><i class="in"></i>Check-in</span>
+      <span><i class="in"></i>Check-in (&#10003; = checked in)</span>
       <span><i class="out"></i>Check-out</span>
       <span><i class="turn"></i>Out and in same day</span>
       <span><i class="stay"></i>Staying</span>
@@ -556,13 +559,13 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function renderToday() {
     var t = ymd(new Date()), conf = configuredRooms(), arr = 0, dep = 0, busy = {};
     state.bookings.forEach(function (b) {
-      if (b.checkIn === t) arr += 1;
+      if (b.checkIn === t && !b.checkedInAt) arr += 1;
       if (b.checkOut === t) dep += 1;
       if (b.checkIn <= t && t < b.checkOut) busy[String(b.roomNumber)] = true;
     });
     var vacant = conf.filter(function (r) { return !busy[r]; }).length;
     $('todayStrip').innerHTML =
-      '<div class="pill in"><b>' + arr + '</b><span>Arriving today</span></div>' +
+      '<div class="pill in"><b>' + arr + '</b><span>Yet to check in</span></div>' +
       '<div class="pill out"><b>' + dep + '</b><span>Leaving today</span></div>' +
       '<div class="pill"><b>' + vacant + '</b><span>Vacant tonight</span></div>';
   }
@@ -588,7 +591,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     var b = bs[0], st = statusOf(b, day);
     return '<button class="cell ' + st.cls + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + st.label + ', ' + esc(b.guestName) + '">' +
-      '<span class="tag">' + st.tag + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
+      '<span class="tag">' + st.tag + (st.cls === 'in' && b.checkedInAt ? ' \u2713' : '') + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
   }
 
   function renderGrid() {
@@ -612,7 +615,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 
   function stayBadge(b, t) {
-    if (b.checkIn === t) return '<span class="badge in">Arriving today</span>';
+    if (b.checkIn === t) return b.checkedInAt ? '<span class="badge in">Checked in</span>' : '<span class="badge in">Arriving today</span>';
     if (b.checkOut === t) return '<span class="badge out">Leaving today</span>';
     if (b.checkIn < t && t < b.checkOut) return '<span class="badge stay">In house</span>';
     if (b.checkIn > t) return '<span class="badge">Upcoming</span>';
@@ -635,10 +638,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       return;
     }
     $('bookingList').innerHTML = list.map(function (b) {
-      var asking = state.confirmDelete === b.id, past = b.checkOut < t;
+      var asking = state.confirmDelete === b.id, past = b.checkOut < t, ciHtml = checkinHtml(b, t, past);
       return '<div class="card bk' + (past ? ' past' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
-        '<div class="dates">' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + ' &middot; ' + nights(b) + ' night' + (nights(b) === 1 ? '' : 's') + '</div></div>' +
+        '<div class="dates">' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + ' &middot; ' + nights(b) + ' night' + (nights(b) === 1 ? '' : 's') + '</div>' + ciHtml + '</div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
           : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
@@ -692,9 +695,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('sheetTitle').textContent = 'Room ' + room + ' · ' + fmtLong(day);
     $('sheetBody').innerHTML = bs.map(function (b) {
       var st = statusOf(b, day);
+      var cin = b.checkedInAt ? '<button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo check-in</button>'
+        : (b.checkIn === ymd(new Date()) && day === b.checkIn ? '<button class="btn small primary" data-action="checkin" data-id="' + b.id + '">Check in</button>' : '');
       return '<div class="sheetrow">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') +
-        '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + '</div></div>' +
-        '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div>';
+        '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + (b.checkedInAt ? ' &middot; Checked in ' + esc(stampText(b.checkedInAt)) : '') + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + cin + '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div></div>';
     }).join('') + (free
       ? '<button class="btn primary" style="width:100%" data-action="sheetBook" data-room="' + esc(room) + '" data-day="' + day + '">Book this room from ' + esc(fmtDay(parseYmd(day))) + '</button>'
       : '');
@@ -747,7 +752,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     if (state.editId) {
       state.bookings = state.bookings.map(function (b) {
-        return b.id === state.editId ? { id: b.id, roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co } : b;
+        return b.id === state.editId ? Object.assign({}, b, { roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co }) : b;
       });
       toast('Booking updated.');
     } else {
@@ -779,10 +784,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var sorted = state.bookings.slice().sort(function (a, b) {
       return cmpRoom(a.roomNumber, b.roomNumber) || (a.checkIn < b.checkIn ? -1 : 1);
     });
-    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights']];
-    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b)]); });
+    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in']];
+    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '']); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
 
     var days = [];
@@ -794,7 +799,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       occ.push([room].concat(days.map(function (d) {
         var day = ymd(d), bs = bookingsOn(room, day);
         if (!bs.length) return '-';
-        return bs.map(function (b) { return statusOf(b, day).tag + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''); }).join(' / ');
+        return bs.map(function (b) { return statusOf(b, day).tag + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : '') + (b.checkedInAt && day === b.checkIn ? ' [checked in]' : ''); }).join(' / ');
       })));
     });
     var ws2 = XLSX.utils.aoa_to_sheet(occ);
@@ -867,10 +872,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           }
         }
         /* columns by header name, so files exported before Company existed still import */
-        var cG = 1, cC = -1, cI = 2, cO = 3;
+        var cG = 1, cC = -1, cI = 2, cO = 3, cK = -1;
         if (hdr) {
           if (hdr.indexOf('guest') >= 0) cG = hdr.indexOf('guest');
           cC = hdr.indexOf('company');
+          cK = hdr.indexOf('checked in');
           if (hdr.indexOf('check-in') >= 0) cI = hdr.indexOf('check-in');
           if (hdr.indexOf('check-out') >= 0) cO = hdr.indexOf('check-out');
         }
@@ -882,7 +888,12 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           if (!room && !guest && !row[cI] && !row[cO]) continue;
           var ci = toYmd(row[cI]), co = toYmd(row[cO]);
           if (!room || !guest || !ci || !co || co <= ci) { skipped += 1; continue; }
-          out.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co });
+          var rec = { id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co };
+          if (cK >= 0 && row[cK]) {
+            var kd = row[cK] instanceof Date ? row[cK] : new Date(String(row[cK]).trim().replace(' ', 'T'));
+            if (!isNaN(kd)) rec.checkedInAt = kd.toISOString();
+          }
+          out.push(rec);
         }
         var settings = null;
         if (wb.Sheets['Settings']) {
@@ -955,6 +966,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         persist(); render(); toast('Booking deleted.');
         break;
       case 'closeModal': closeModal(); break;
+      case 'checkin': setCheckin(id, true); break;
+      case 'undoCheckin': setCheckin(id, false); break;
       case 'share': openShare(); break;
       case 'shareScope': state.shareScope = el.getAttribute('data-v'); renderShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
@@ -1004,9 +1017,37 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }, { passive: true });
   })();
 
+  /* ---------- check-in mark ---------- */
+  function stampText(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var tm = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+    return ymd(d) === ymd(new Date()) ? tm : fmtDay(d) + ', ' + tm;
+  }
+  function stampLocal(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function checkinHtml(b, t, past) {
+    if (b.checkedInAt) return '<div class="ci-line"><span>Checked in ' + esc(stampText(b.checkedInAt)) + '</span><button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo</button></div>';
+    if (b.checkIn === t && !past) return '<button class="btn small primary ci-btn" data-action="checkin" data-id="' + b.id + '">Check in</button>';
+    return '';
+  }
+  function setCheckin(id, on) {
+    var hit = null;
+    state.bookings.forEach(function (b) {
+      if (b.id !== id) return;
+      hit = b;
+      if (on) b.checkedInAt = new Date().toISOString(); else delete b.checkedInAt;
+    });
+    if (!hit) return;
+    persist(); closeSheet(); render();
+    toast(on ? 'Room ' + hit.roomNumber + ' checked in.' : 'Check-in undone for room ' + hit.roomNumber + '.');
+  }
+
   /* ---------- share bookings (summary text only) ---------- */
   function statusText(b, t) {
-    if (b.checkIn === t) return 'Arriving today';
+    if (b.checkIn === t) return b.checkedInAt ? 'Checked in' : 'Arriving today';
     if (b.checkOut === t) return 'Leaving today';
     if (b.checkIn < t && t < b.checkOut) return 'In house';
     if (b.checkIn > t) return 'Upcoming';
@@ -1023,9 +1064,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var now = new Date(), t = ymd(now);
     var stamp = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
+    var arrIn = list.filter(function (b) { return b.checkIn === t && b.checkedInAt; }).length;
     var dep = list.filter(function (b) { return b.checkOut === t; }).length;
     var lines = ['Hotel bookings as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
-      'Arriving today: ' + arr + ' | Leaving today: ' + dep + ' | Bookings: ' + list.length, ''];
+      'Arriving today: ' + arr + (arr ? ' (' + arrIn + ' checked in)' : '') + ' | Leaving today: ' + dep + ' | Bookings: ' + list.length, ''];
     list.forEach(function (b) {
       lines.push('Room ' + b.roomNumber + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''));
       lines.push('  ' + fmtDay(parseYmd(b.checkIn)) + ' to ' + fmtDay(parseYmd(b.checkOut)) + ', ' + nights(b) + (nights(b) === 1 ? ' night' : ' nights') + ' - ' + statusText(b, t));
