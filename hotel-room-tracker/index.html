@@ -300,6 +300,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     </div>
     <p class="tip">Tap a cell to book or edit. Swipe the grid to change week.</p>
     <div class="listhead"><h2 id="listTitle">Bookings</h2><button class="btn small" id="shareBtn" data-action="share">Share</button></div>
+    <div class="seg" id="listSeg" style="margin-top:8px"></div>
     <div class="list" id="bookingList"></div>
   </section>
 
@@ -432,7 +433,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     vacDate: ymd(new Date()),
     confirmDelete: null,
     pendingImport: null,
-    shareScope: 'current',
+    shareScope: 'week',
+    listScope: 'week',
     shareMsg: ''
   };
   var downloads = null;
@@ -625,16 +627,19 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function renderList() {
     var t = ymd(new Date());
     var list = state.bookings.filter(function (b) {
-      return state.filter === 'all' || String(b.roomNumber) === state.filter;
+      if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return false;
+      return state.listScope === 'all' || inWeek(b);
     }).sort(function (a, b) {
       var pa = a.checkOut < t, pb = b.checkOut < t;
       if (pa !== pb) return pa ? 1 : -1;
       if (pa) return a.checkOut < b.checkOut ? 1 : -1;
       return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber));
     });
+    $('listSeg').innerHTML = '<button class="btn small' + (state.listScope === 'week' ? ' on' : '') + '" data-action="listScope" data-v="week">' + esc(weekRangeText()) + '</button>' +
+      '<button class="btn small' + (state.listScope === 'all' ? ' on' : '') + '" data-action="listScope" data-v="all">All dates</button>';
     $('listTitle').textContent = 'Bookings (' + list.length + ')';
     if (!list.length) {
-      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">No bookings yet. Tap + to add the first one.</div>';
+      $('bookingList').innerHTML = '<div class="empty card" style="grid-column:1/-1">' + (!state.bookings.length ? 'No bookings yet. Tap + to add the first one.' : (state.listScope === 'week' ? 'No bookings in this week.' : 'No bookings for this room.')) + '</div>';
       return;
     }
     $('bookingList').innerHTML = list.map(function (b) {
@@ -969,6 +974,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'checkin': setCheckin(id, true); break;
       case 'undoCheckin': setCheckin(id, false); break;
       case 'share': openShare(); break;
+      case 'listScope': state.listScope = el.getAttribute('data-v'); renderList(); break;
       case 'shareScope': state.shareScope = el.getAttribute('data-v'); renderShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
       case 'saveSettings': saveSettings(); break;
@@ -1017,6 +1023,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }, { passive: true });
   })();
 
+  /* ---------- week helpers ---------- */
+  function inWeek(b) { return b.checkIn <= ymd(addDays(state.weekStart, 6)) && b.checkOut >= ymd(state.weekStart); }
+  function weekRangeText() { return fmtDay(state.weekStart) + ' to ' + fmtDay(addDays(state.weekStart, 6)); }
+
   /* ---------- check-in mark ---------- */
   function stampText(iso) {
     var d = new Date(iso);
@@ -1057,6 +1067,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var t = ymd(new Date());
     return state.bookings.filter(function (b) {
       if (state.filter !== 'all' && String(b.roomNumber) !== state.filter) return false;
+      if (scope === 'week') return inWeek(b);
       return scope === 'all' || b.checkOut >= t;
     }).sort(function (a, b) { return a.checkIn < b.checkIn ? -1 : (a.checkIn > b.checkIn ? 1 : cmpRoom(a.roomNumber, b.roomNumber)); });
   }
@@ -1066,7 +1077,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
     var arrIn = list.filter(function (b) { return b.checkIn === t && b.checkedInAt; }).length;
     var dep = list.filter(function (b) { return b.checkOut === t; }).length;
-    var lines = ['Hotel bookings as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
+    var lines = ['Hotel bookings' + (state.shareScope === 'week' ? ' for ' + weekRangeText() : '') + ' as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
       'Arriving today: ' + arr + (arr ? ' (' + arrIn + ' checked in)' : '') + ' | Leaving today: ' + dep + ' | Bookings: ' + list.length, ''];
     list.forEach(function (b) {
       lines.push('Room ' + b.roomNumber + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''));
@@ -1092,10 +1103,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
   function renderShare() {
     var scope = state.shareScope, list = shareList(scope);
-    var nCur = shareList('current').length, nAll = shareList('all').length;
+    var nWeek = shareList('week').length, nCur = shareList('current').length, nAll = shareList('all').length;
     state.shareMsg = buildMessage(list);
     $('sheetBody').innerHTML =
       '<div class="fg"><div class="lbl">What to include' + (state.filter !== 'all' ? ' (Room ' + esc(state.filter) + ' only)' : '') + '</div><div class="seg">' +
+      '<button class="btn small' + (scope === 'week' ? ' on' : '') + '" data-action="shareScope" data-v="week">Week shown: ' + esc(weekRangeText()) + ' (' + nWeek + ')</button>' +
       '<button class="btn small' + (scope === 'current' ? ' on' : '') + '" data-action="shareScope" data-v="current">Current and upcoming (' + nCur + ')</button>' +
       '<button class="btn small' + (scope === 'all' ? ' on' : '') + '" data-action="shareScope" data-v="all">All (' + nAll + ')</button></div></div>' +
       '<div class="fg"><label class="lbl" for="shareText">Summary</label><textarea class="field" id="shareText" readonly></textarea></div>' +
