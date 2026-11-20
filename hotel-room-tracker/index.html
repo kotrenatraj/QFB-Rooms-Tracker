@@ -1116,13 +1116,22 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
     var arrIn = list.filter(function (b) { return b.checkIn === t && b.checkedInAt; }).length;
     var dep = list.filter(function (b) { return b.checkOut === t; }).length;
-    var lines = ['Hotel bookings' + ' for ' + weekRangeText() + ' as of ' + stamp + (state.filter !== 'all' ? ' (Room ' + state.filter + ')' : ''),
-      'Arriving today: ' + arr + (arr ? ' (' + arrIn + ' checked in)' : '') + ' | Leaving today: ' + dep + ' | Bookings: ' + list.length, ''];
-    list.forEach(function (b) {
-      lines.push('Room ' + b.roomNumber + ' - ' + b.guestName + (b.company ? ' (' + b.company + ')' : ''));
-      lines.push('  ' + fmtDay(parseYmd(b.checkIn)) + ' to ' + fmtDay(parseYmd(b.checkOut)) + ', ' + nights(b) + (nights(b) === 1 ? ' night' : ' nights') + ' - ' + statusText(b, t));
+    var thick = '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501';
+    var thin = thick.replace(/\u2501/g, '\u2500');
+    var lines = [thick, 'HOTEL BOOKINGS', weekRangeText() + (state.filter !== 'all' ? ' | Room ' + state.filter : ''), 'As of ' + stamp, thick,
+      'Total bookings: ' + list.length,
+      'Arriving today: ' + arr + (arr ? ' (' + arrIn + ' checked in)' : ''),
+      'Leaving today: ' + dep, thick];
+    list.forEach(function (b, i) {
+      var n = nights(b);
+      lines.push('ROOM ' + b.roomNumber);
+      lines.push('Guest: ' + b.guestName);
+      if (b.company) lines.push('Company: ' + b.company);
+      lines.push('Stay: ' + fmtDay(parseYmd(b.checkIn)) + ' to ' + fmtDay(parseYmd(b.checkOut)) + ' (' + n + (n === 1 ? ' night)' : ' nights)'));
+      lines.push('Status: ' + statusText(b, t));
+      lines.push(i < list.length - 1 ? thin : thick);
     });
-    if (!list.length) lines.push('No bookings to show.');
+    if (!list.length) { lines.push('No bookings to show.'); lines.push(thick); }
     return lines.join('\n');
   }
   function copyText(text, okMsg) {
