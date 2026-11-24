@@ -87,6 +87,9 @@ textarea.field { min-height: 96px; resize: vertical; }
 label.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 5px; }
 
+.todayhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin: 0 0 6px; }
+.todayhead b { font-family: var(--font-head); font-size: 17px; font-weight: 700; }
+.todayhead span { color: var(--muted); font-size: 12px; }
 .todaystrip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
 .pill { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .pill b { font-family: var(--font-head); font-size: 20px; display: block; line-height: 1.15; }
@@ -308,6 +311,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       </div>
       <div class="row"><div class="big" id="nightsRange"></div><div class="cap" id="nightsRangeSub"></div></div>
     </div>
+    <div class="todayhead"><b id="todayDate"></b><span>Today's snapshot &middot; stays the same when you change the week</span></div>
     <div class="todaystrip" id="todayStrip"></div>
     <div class="weeknav">
       <button class="btn" data-action="prevWeek" aria-label="Previous week">&#9664;</button>
@@ -727,6 +731,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       if (b.checkIn <= t && t < b.checkOut) busy[String(b.roomNumber)] = true;
     });
     var vacant = conf.filter(function (r) { return !busy[r]; }).length;
+    $('todayDate').textContent = 'TODAY \u00b7 ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
     $('todayStrip').innerHTML =
       '<div class="pill in"><b>' + arr + '</b><span>Yet to check in</span></div>' +
       '<div class="pill out"><b>' + dep + '</b><span>Leaving today</span></div>' +
