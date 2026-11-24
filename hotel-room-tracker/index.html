@@ -131,6 +131,8 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .cell.out { background: var(--out-bg); color: var(--out); }
 .cell.stay { background: var(--stay-bg); color: var(--stay); }
 .cell.day { background: var(--accent-soft); color: var(--accent); }
+.cell.clash { box-shadow: inset 0 0 0 2px var(--danger); }
+.cell.clash .tag::after { content: ' \26a0'; }
 .cell.vac { background: var(--vac-bg); color: var(--vac); }
 .cell.turn { background: linear-gradient(135deg, var(--out-bg) 50%, var(--in-bg) 50%); color: var(--fg); }
 .cell:hover { filter: brightness(0.96); }
@@ -153,6 +155,12 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .badge { font-family: var(--font-body); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--vac-bg); color: var(--muted); }
 .badge.in { background: var(--in-bg); color: var(--in); }
 .badge.out { background: var(--out-bg); color: var(--out); }
+.badge.clash { background: var(--danger-bg); color: var(--danger); }
+.card.bk.clash { border-color: var(--danger); }
+.timewarn { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; }
+.tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tgrid > div { min-width: 0; }
+.tgrid input.field { min-width: 0; }
 .badge.stay { background: var(--stay-bg); color: var(--stay); }
 .bk .guest { color: var(--fg); margin-top: 1px; overflow-wrap: anywhere; }
 .bk .dates { color: var(--muted); font-size: 12px; margin-top: 3px; }
@@ -363,6 +371,14 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         <textarea class="field" id="sRooms" placeholder="101, 102, 103, 201, 202"></textarea>
         <div class="hint">Separate with commas or new lines. Leave empty to number rooms 1, 2, 3 and so on.</div>
       </div>
+      <div class="row">
+        <label class="lbl">Standard times</label>
+        <div class="tgrid">
+          <div><label class="hint" for="sStdIn" style="display:block;margin:0 0 3px">Check-in from</label><input class="field" type="time" id="sStdIn"></div>
+          <div><label class="hint" for="sStdOut" style="display:block;margin:0 0 3px">Check-out by</label><input class="field" type="time" id="sStdOut"></div>
+        </div>
+        <div class="hint">Used when a booking has no time of its own, to spot same-day clashes (a guest leaving after the next one is due in).</div>
+      </div>
       <button class="btn primary" data-action="saveSettings">Save settings</button>
     </div>
     <div class="card settings">
@@ -405,10 +421,14 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       <div class="fg">
         <label class="lbl" for="fIn">Check-in date</label>
         <input class="field" type="date" id="fIn">
+        <label class="lbl" for="fInT" style="margin-top:8px">Check-in time <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input class="field" type="time" id="fInT">
       </div>
       <div class="fg">
         <label class="lbl" for="fOut">Check-out date</label>
         <input class="field" type="date" id="fOut">
+        <label class="lbl" for="fOutT" style="margin-top:8px">Check-out time <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input class="field" type="time" id="fOutT">
         <div class="quick">
           <span>Nights</span>
           <button type="button" class="btn small" data-action="nights" data-n="0">Same day</button>
@@ -418,6 +438,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           <button type="button" class="btn small" data-action="nights" data-n="7">7</button>
         </div>
       </div>
+      <div class="timewarn" id="timeWarn" hidden></div>
       <div class="acts">
         <button type="button" class="btn" data-action="closeModal">Cancel</button>
         <button type="submit" class="btn primary" id="saveBtn">Add booking</button>
@@ -478,6 +499,48 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function fmt(s) { return parseYmd(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
   function fmtDay(d) { return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); }
   function fmtLong(s) { return parseYmd(s).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  /* ---------- times and same-day clashes ---------- */
+  function tmin(t) { var m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; }
+  function fmtTime(t) { var m = tmin(t); if (m === null) return ''; var h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + (h < 12 ? ' am' : ' pm'); }
+  function stdIn() { return state.settings.stdIn || '14:00'; }
+  function stdOut() { return state.settings.stdOut || '11:00'; }
+  function timeNote(b) {
+    var a = b.inTime ? fmtTime(b.inTime) : '', o = b.outTime ? fmtTime(b.outTime) : '';
+    if (!a && !o) return '';
+    if (isDayUse(b)) return (a || '?') + ' to ' + (o || '?');
+    return (a ? 'in ' + a : '') + (a && o ? ', ' : '') + (o ? 'out ' + o : '');
+  }
+  /* minutes of this day during which booking b holds the room; null when it cannot be told */
+  function dayWindow(b, day) {
+    if (b.checkIn === b.checkOut) {
+      var s0 = tmin(b.inTime), e0 = tmin(b.outTime);
+      return s0 === null || e0 === null ? null : { s: s0, e: e0 };
+    }
+    if (day === b.checkIn) { var s1 = tmin(b.inTime); return { s: s1 === null ? tmin(stdIn()) : s1, e: 1440 }; }
+    if (day === b.checkOut) { var e2 = tmin(b.outTime); return { s: 0, e: e2 === null ? tmin(stdOut()) : e2 }; }
+    return { s: 0, e: 1440 };
+  }
+  /* other bookings of the same room whose hours overlap booking b on its check-in or check-out day */
+  function timeClashes(b, onlyDay) {
+    var found = [], days = onlyDay ? [onlyDay] : (b.checkIn === b.checkOut ? [b.checkIn] : [b.checkIn, b.checkOut]);
+    days.forEach(function (day) {
+      var w = dayWindow(b, day);
+      if (!w) return;
+      state.bookings.forEach(function (o) {
+        if (o === b || o.id === b.id || String(o.roomNumber) !== String(b.roomNumber) || found.indexOf(o) >= 0) return;
+        if (o.checkIn > day || o.checkOut < day) return;
+        var ow = dayWindow(o, day);
+        if (ow && w.s < ow.e && ow.s < w.e) found.push(o);
+      });
+    });
+    return found;
+  }
+  function roomDayClash(room, day) {
+    return bookingsOn(room, day).some(function (b) { return timeClashes(b, day).length > 0; });
+  }
+  function clashText(b) {
+    return timeClashes(b).map(function (o) { return o.guestName + ' (' + fmtDay(parseYmd(o.checkIn)) + (isDayUse(o) ? '' : ' to ' + fmtDay(parseYmd(o.checkOut))) + (timeNote(o) ? ', ' + timeNote(o) : '') + ')'; }).join('; ');
+  }
   function isDayUse(b) { return b.checkIn === b.checkOut; }
   function stayWord(b) { var n = nights(b); return isDayUse(b) ? 'Same day' : n + (n === 1 ? ' night' : ' nights'); }
   /* does a stay ci..co clash with booking b? Normal stays may touch at the ends (back-to-back);
@@ -514,6 +577,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       if (s && typeof s === 'object') {
         state.settings.totalRooms = +s.totalRooms > 0 ? +s.totalRooms : 10;
         state.settings.roomNumbers = Array.isArray(s.roomNumbers) ? s.roomNumbers.map(String) : [];
+        if (tmin(s.stdIn) !== null) state.settings.stdIn = s.stdIn;
+        if (tmin(s.stdOut) !== null) state.settings.stdOut = s.stdOut;
       }
     } catch (e) {}
   }
@@ -641,21 +706,21 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 
   function cellHtml(room, day) {
-    var bs = bookingsOn(room, day), a = ' data-action="cell" data-room="' + esc(room) + '" data-day="' + day + '"';
+    var bs = bookingsOn(room, day), a = ' data-action="cell" data-room="' + esc(room) + '" data-day="' + day + '"', clash = roomDayClash(room, day) ? ' clash' : '';
     if (!bs.length) {
       return '<button class="cell vac"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', vacant. Book">&ndash;</button>';
     }
     if (bs.length > 1 && bs.some(isDayUse)) {
-      return '<button class="cell turn"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + bs.length + ' stays">' +
+      return '<button class="cell turn' + clash + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + bs.length + ' stays' + (clash ? ', time clash' : '') + '">' +
         '<span class="tag">' + bs.length + ' STAYS</span>' + bs.slice(0, 2).map(function (x) { return '<span class="who">' + esc(x.guestName) + '</span>'; }).join('') + '</button>';
     }
     if (bs.length > 1) {
       var o = bs[0], n = bs[bs.length - 1];
-      return '<button class="cell turn"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + esc(o.guestName) + ' checks out, ' + esc(n.guestName) + ' checks in">' +
+      return '<button class="cell turn' + clash + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + (clash ? ', time clash' : '') + ', ' + esc(o.guestName) + ' checks out, ' + esc(n.guestName) + ' checks in">' +
         '<span class="tag">OUT/IN</span><span class="who">' + esc(o.guestName) + '</span><span class="who">' + esc(n.guestName) + '</span></button>';
     }
     var b = bs[0], st = statusOf(b, day);
-    return '<button class="cell ' + st.cls + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + st.label + ', ' + esc(b.guestName) + '">' +
+    return '<button class="cell ' + st.cls + clash + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + st.label + ', ' + esc(b.guestName) + '">' +
       '<span class="tag">' + st.tag + (st.cls === 'in' && b.checkedInAt ? ' \u2713' : '') + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
   }
 
@@ -703,9 +768,9 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     $('bookingList').innerHTML = list.map(function (b) {
       var asking = state.confirmDelete === b.id, past = b.checkOut < t, ciHtml = checkinHtml(b, t, past);
-      return '<div class="card bk' + (past ? ' past' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
+      return '<div class="card bk' + (past ? ' past' : '') + (timeClashes(b).length ? ' clash' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
-        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + ciHtml + '</div>' +
+        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + (timeNote(b) ? '<div class="dates">' + esc(timeNote(b)) + '</div>' : '') + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
           : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
@@ -741,6 +806,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function renderSettings() {
     $('sTotal').value = state.settings.totalRooms;
     $('sRooms').value = state.settings.roomNumbers.join(', ');
+    $('sStdIn').value = stdIn();
+    $('sStdOut').value = stdOut();
   }
 
   function switchTab(t) {
@@ -763,7 +830,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       var cin = b.checkedInAt ? '<button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo check-in</button>'
         : (b.checkIn === ymd(new Date()) && day === b.checkIn ? '<button class="btn small primary" data-action="checkin" data-id="' + b.id + '">Check in</button>' : '');
       return '<div class="sheetrow">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') +
-        '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + (b.checkedInAt ? ' &middot; Checked in ' + esc(stampText(b.checkedInAt)) : '') + '</div></div>' +
+        '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + (timeNote(b) ? ' &middot; ' + esc(timeNote(b)) : '') + (b.checkedInAt ? ' &middot; Checked in ' + esc(stampText(b.checkedInAt)) : '') + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + cin + '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div></div>';
     }).join('') + (free
       ? '<button class="btn primary" style="width:100%" data-action="sheetBook" data-room="' + esc(room) + '" data-day="' + day + '">Book this room from ' + esc(fmtDay(parseYmd(day))) + '</button>'
@@ -785,6 +852,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('fCompany').value = b ? (b.company || '') : '';
     $('fIn').value = ci;
     $('fOut').value = b ? b.checkOut : ymd(addDays(parseYmd(ci), 1));
+    $('fInT').value = b && b.inTime ? b.inTime : '';
+    $('fOutT').value = b && b.outTime ? b.outTime : '';
     $('roomOptions').innerHTML = allRooms().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
     var seenCo = {};
     $('companyOptions').innerHTML = state.bookings.map(function (x) { return x.company || ''; }).filter(function (c) {
@@ -792,6 +861,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       seenCo[c.toLowerCase()] = true; return true;
     }).sort().map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
     formError('');
+    updateTimeWarn();
     $('overlay').hidden = false;
     setTimeout(function () { ($('fRoom').value ? $('fGuest') : $('fRoom')).focus(); }, 0);
   }
@@ -801,11 +871,24 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     e.textContent = msg;
     e.hidden = !msg;
   }
+  function formCandidate() {
+    return { id: state.editId || -1, roomNumber: $('fRoom').value.trim(), guestName: $('fGuest').value.trim() || 'this booking', checkIn: $('fIn').value, checkOut: $('fOut').value, inTime: $('fInT').value, outTime: $('fOutT').value };
+  }
+  function updateTimeWarn() {
+    var c = formCandidate(), w = $('timeWarn'), msg = '';
+    if (c.roomNumber && c.checkIn && c.checkOut && c.checkOut >= c.checkIn) {
+      var hits = timeClashes(c);
+      if (hits.length) msg = '\u26a0 Time clash in room ' + c.roomNumber + ' with ' + hits.map(function (o) { return o.guestName + (timeNote(o) ? ' (' + timeNote(o) + ')' : ''); }).join(', ') + '. You can still save; it will be highlighted.';
+    }
+    w.textContent = msg; w.hidden = !msg;
+  }
   function submitBooking(ev) {
     ev.preventDefault();
     var room = $('fRoom').value.trim(), guest = $('fGuest').value.trim(), company = $('fCompany').value.trim(), ci = $('fIn').value, co = $('fOut').value;
     if (!room || !guest || !ci || !co) return formError('Fill in the room, guest name and both dates.');
     if (co < ci) return formError('Check-out cannot be before check-in. For a same-day stay, use the same date for both.');
+    var inT = $('fInT').value, outT = $('fOutT').value;
+    if (ci === co && inT && outT && outT <= inT) return formError('For a same-day stay, check-out time must be after check-in time.');
     var clash = null;
     state.bookings.forEach(function (b) {
       if (b.id === state.editId || String(b.roomNumber) !== room) return;
@@ -817,11 +900,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     if (state.editId) {
       state.bookings = state.bookings.map(function (b) {
-        return b.id === state.editId ? Object.assign({}, b, { roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co }) : b;
+        return b.id === state.editId ? Object.assign({}, b, { roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT }) : b;
       });
       toast('Booking updated.');
     } else {
-      state.bookings.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co });
+      state.bookings.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT });
       toast('Booking added to room ' + room + '.');
     }
     persist();
@@ -837,7 +920,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var total = parseInt($('sTotal').value, 10);
     if (rooms.length) total = rooms.length;
     if (!total || total < 1 || total > 500) { toast('Enter a total between 1 and 500 rooms.'); return; }
-    state.settings = { totalRooms: total, roomNumbers: rooms };
+    state.settings = { totalRooms: total, roomNumbers: rooms, stdIn: tmin($('sStdIn').value) !== null ? $('sStdIn').value : '14:00', stdOut: tmin($('sStdOut').value) !== null ? $('sStdOut').value : '11:00' };
     persist();
     renderSettings();
     toast('Saved. ' + total + ' rooms in your hotel.');
@@ -849,10 +932,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var sorted = state.bookings.slice().sort(function (a, b) {
       return cmpRoom(a.roomNumber, b.roomNumber) || (a.checkIn < b.checkIn ? -1 : 1);
     });
-    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in']];
-    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '']); });
+    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in', 'Check-in time', 'Check-out time']];
+    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '', b.inTime || '', b.outTime || '']); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }, { wch: 14 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
 
     var days = [];
@@ -937,11 +1020,13 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           }
         }
         /* columns by header name, so files exported before Company existed still import */
-        var cG = 1, cC = -1, cI = 2, cO = 3, cK = -1;
+        var cG = 1, cC = -1, cI = 2, cO = 3, cK = -1, cTi = -1, cTo = -1;
         if (hdr) {
           if (hdr.indexOf('guest') >= 0) cG = hdr.indexOf('guest');
           cC = hdr.indexOf('company');
           cK = hdr.indexOf('checked in');
+          cTi = hdr.indexOf('check-in time');
+          cTo = hdr.indexOf('check-out time');
           if (hdr.indexOf('check-in') >= 0) cI = hdr.indexOf('check-in');
           if (hdr.indexOf('check-out') >= 0) cO = hdr.indexOf('check-out');
         }
@@ -954,6 +1039,14 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           var ci = toYmd(row[cI]), co = toYmd(row[cO]);
           if (!room || !guest || !ci || !co || co < ci) { skipped += 1; continue; }
           var rec = { id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co };
+          var xt = function (v) {
+            if (v instanceof Date) return ('0' + v.getHours()).slice(-2) + ':' + ('0' + v.getMinutes()).slice(-2);
+            if (typeof v === 'number' && v >= 0 && v < 1) { var mm = Math.round(v * 1440); return ('0' + Math.floor(mm / 60)).slice(-2) + ':' + ('0' + (mm % 60)).slice(-2); }
+            var m = /^(\d{1,2}):(\d{2})/.exec(String(v == null ? '' : v).trim());
+            return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : '';
+          };
+          if (cTi >= 0) rec.inTime = xt(row[cTi]);
+          if (cTo >= 0) rec.outTime = xt(row[cTo]);
           if (cK >= 0 && row[cK]) {
             var kd = row[cK] instanceof Date ? row[cK] : new Date(String(row[cK]).trim().replace(' ', 'T'));
             if (!isNaN(kd)) rec.checkedInAt = kd.toISOString();
@@ -986,7 +1079,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var p = state.pendingImport;
     if (!p) return;
     state.bookings = p.bookings;
-    if (p.settings) state.settings = p.settings;
+    if (p.settings) state.settings = Object.assign({}, state.settings, p.settings);
     state.pendingImport = null;
     persist();
     if (state.tab === 'settings') renderSettings();
@@ -1019,7 +1112,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'sheetBook': closeSheet(); openModal(null, { room: room, checkIn: day }); break;
       case 'closeSheet': closeSheet(); break;
       case 'nights':
-        if ($('fIn').value) $('fOut').value = ymd(addDays(parseYmd($('fIn').value), +el.getAttribute('data-n')));
+        if ($('fIn').value) { $('fOut').value = ymd(addDays(parseYmd($('fIn').value), +el.getAttribute('data-n'))); updateTimeWarn(); }
         else formError('Pick the check-in date first.');
         break;
       case 'edit': openModal(id, null); break;
@@ -1049,8 +1142,9 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   $('bookingForm').addEventListener('submit', submitBooking);
   $('fIn').addEventListener('change', function () {
     var ci = $('fIn').value;
-    if (ci && (!$('fOut').value || $('fOut').value <= ci)) $('fOut').value = ymd(addDays(parseYmd(ci), 1));
+    if (ci && (!$('fOut').value || $('fOut').value < ci)) $('fOut').value = ymd(addDays(parseYmd(ci), 1));
   });
+  ['fRoom', 'fIn', 'fOut', 'fInT', 'fOutT'].forEach(function (id) { $(id).addEventListener('change', updateTimeWarn); $(id).addEventListener('input', updateTimeWarn); });
   $('importFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0];
     handleFile(f);
@@ -1149,7 +1243,9 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       lines.push('Guest: ' + b.guestName);
       if (b.company) lines.push('Company: ' + b.company);
       lines.push('Stay: ' + (isDayUse(b) ? fmtDay(parseYmd(b.checkIn)) + ' (same day)' : fmtDay(parseYmd(b.checkIn)) + ' to ' + fmtDay(parseYmd(b.checkOut)) + ' (' + n + (n === 1 ? ' night)' : ' nights)')));
+      if (timeNote(b)) lines.push('Time: ' + timeNote(b));
       lines.push('Status: ' + statusText(b, t));
+      if (timeClashes(b).length) lines.push('CLASH with ' + clashText(b));
       lines.push(i < list.length - 1 ? thin : thick);
     });
     if (!list.length) { lines.push('No bookings to show.'); lines.push(thick); }
