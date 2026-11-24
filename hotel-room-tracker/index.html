@@ -107,6 +107,20 @@ label.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5p
 .nights .range > div { min-width: 0; }
 .nights .range input.field { min-width: 0; max-width: 100%; padding-left: 8px; padding-right: 8px; }
 .nights hr { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+.prepcard { background: var(--out-bg); border: 1px solid var(--out); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.prepcard h3 { margin: 0 0 4px; font-size: 14px; color: var(--out); }
+.preprow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--out); }
+.preprow:first-of-type { border-top: 0; }
+.preprow .t { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.preprow .d { color: var(--muted); font-size: 12px; margin-top: 1px; }
+.preprow .d.urgent { color: var(--danger); font-weight: 600; }
+.prepdot { display: block; font-family: var(--font-body); font-size: 9px; letter-spacing: 0.05em; color: var(--out); font-weight: 700; line-height: 1; margin-top: 2px; }
+.hkitem { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); font: inherit; font-size: 15px; cursor: pointer; }
+.hkitem .box { flex: none; width: 24px; height: 24px; border: 2px solid var(--vac); border-radius: 7px; display: grid; place-items: center; color: transparent; font-weight: 700; }
+.hkitem .nm { flex: 1; min-width: 0; }
+.hkitem .tm { font-size: 12px; color: var(--muted); }
+.hkitem.done { background: var(--in-bg); border-color: var(--in); }
+.hkitem.done .box { background: var(--in); border-color: var(--in); color: var(--accent-fg); }
 .thisweek { display: flex; justify-content: center; margin-bottom: 6px; }
 .weeknav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .weeknav .btn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
@@ -161,7 +175,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .badge.out { background: var(--out-bg); color: var(--out); }
 .badge.clash { background: var(--danger-bg); color: var(--danger); }
 .card.bk.clash { border-color: var(--danger); }
-.timewarn { background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; }
+.timewarn { white-space: pre-line; background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; }
 .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tgrid > div { min-width: 0; }
 .tgrid input.field { min-width: 0; }
@@ -314,6 +328,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     </div>
     <div class="todayhead"><b id="todayDate"></b><span>Today's snapshot &middot; stays the same when you change the week</span></div>
     <div class="todaystrip" id="todayStrip"></div>
+    <div class="prepcard" id="prepCard" hidden></div>
     <div class="thisweek"><button class="btn small" data-action="today">This week</button></div>
     <div class="weeknav">
       <button class="btn" data-action="prevWeek" aria-label="Previous week">&#9664;</button>
@@ -677,7 +692,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function render() {
     renderBanner();
     $('fab').hidden = state.tab === 'settings';
-    if (state.tab === 'tracker') { renderNights(); renderToday(); renderFilter(); renderGrid(); renderList(); }
+    if (state.tab === 'tracker') { renderNights(); renderToday(); renderPrep(); renderFilter(); renderGrid(); renderList(); }
     if (state.tab === 'vacancy') renderVacancy();
   }
 
@@ -721,6 +736,97 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var r = nightsBetween(state.rangeFrom, state.rangeTo);
     $('nightsRange').innerHTML = r ? r.nights + ' <small>' + (r.nights === 1 ? 'night' : 'nights') + '</small>' : '<small>' + (state.rangeFrom && state.rangeTo ? 'Check dates' : 'Pick both dates') + '</small>';
     $('nightsRangeSub').textContent = r ? (r.days + (r.days === 1 ? ' day' : ' days') + ' \u00b7 ' + nightsText(r)) : (state.rangeFrom && state.rangeTo ? 'To must be on or after From' : '');
+  }
+  /* ---------- room preparation after check-out ---------- */
+  var HK = [['cleaning', 'Room cleaned'], ['bedding', 'Bedding changed'], ['toiletries', 'Toiletries arranged'], ['towels', 'Towels arranged']];
+  function hkMissing(b) { return HK.filter(function (k) { return !(b.hk && b.hk[k[0]]); }); }
+  function hkNames(list) { return list.map(function (k) { return k[1].toLowerCase(); }).join(', '); }
+  /* the booking whose check-out left the room unprepared, or null when the room is ready */
+  function prepFor(room) {
+    room = String(room);
+    var last = null;
+    state.bookings.forEach(function (b) {
+      if (String(b.roomNumber) !== room || !b.checkedOutAt || !b.hk) return;
+      if (!last || b.checkedOutAt > last.checkedOutAt) last = b;
+    });
+    if (!last) return null;
+    var missing = hkMissing(last);
+    if (!missing.length) return null;
+    var movedIn = state.bookings.some(function (b) { return String(b.roomNumber) === room && b.checkedInAt && b.checkedInAt > last.checkedOutAt; });
+    return movedIn ? null : { b: last, missing: missing };
+  }
+  function nextArrival(room) {
+    var t = ymd(new Date()), nb = null;
+    state.bookings.forEach(function (b) {
+      if (String(b.roomNumber) !== String(room) || b.checkedInAt || b.checkedOutAt || b.checkIn < t) return;
+      if (!nb || b.checkIn < nb.checkIn || (b.checkIn === nb.checkIn && (b.inTime || stdIn()) < (nb.inTime || stdIn()))) nb = b;
+    });
+    return nb;
+  }
+  function nextText(nb) {
+    if (!nb) return '';
+    var today = nb.checkIn === ymd(new Date());
+    return 'Next guest: ' + nb.guestName + ', ' + (today ? 'arrives today ' + timeFor(nb, 'in').replace(' (standard)', '') : fmtDay(parseYmd(nb.checkIn)));
+  }
+  function prepList() {
+    var out = [];
+    allRooms().forEach(function (r) {
+      var pf = prepFor(r);
+      if (pf) out.push({ room: r, pf: pf, next: nextArrival(r) });
+    });
+    var t = ymd(new Date());
+    out.sort(function (a, b) {
+      var ua = a.next && a.next.checkIn === t ? 0 : 1, ub = b.next && b.next.checkIn === t ? 0 : 1;
+      return ua - ub || (a.pf.b.checkedOutAt < b.pf.b.checkedOutAt ? -1 : 1);
+    });
+    return out;
+  }
+  function renderPrep() {
+    var list = prepList(), el = $('prepCard'), t = ymd(new Date());
+    if (!list.length) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = '<h3>Prepare rooms before the next guest (' + list.length + ')</h3>' + list.slice(0, 6).map(function (x) {
+      var urgent = x.next && x.next.checkIn === t;
+      return '<div class="preprow"><div class="t"><b>Room ' + esc(x.room) + '</b> &middot; ' + x.pf.missing.length + ' of 4 left: ' + esc(hkNames(x.pf.missing)) +
+        (x.next ? '<div class="d' + (urgent ? ' urgent' : '') + '">' + (urgent ? '\u26a0 ' : '') + esc(nextText(x.next)) + '</div>' : '') + '</div>' +
+        '<button class="btn small primary" data-action="prep" data-room="' + esc(x.room) + '">Open</button></div>';
+    }).join('') + (list.length > 6 ? '<div class="d" style="margin-top:6px">+ ' + (list.length - 6) + ' more rooms (look for PREP in the room column)</div>' : '');
+  }
+  function openPrep(room, checkinId) {
+    var pf = prepFor(room);
+    if (!pf) { closeSheet(); return; }
+    var b = pf.b, nb = nextArrival(room), urgent = nb && nb.checkIn === ymd(new Date());
+    $('sheetTitle').textContent = 'Prepare Room ' + room;
+    $('sheetBody').innerHTML =
+      '<div class="hint" style="margin:0 0 8px">' + esc(b.guestName) + ' checked out ' + esc(stampText(b.checkedOutAt)) + '. Tick each task as it is done.</div>' +
+      (nb ? '<div class="timewarn" style="' + (urgent ? '' : 'background:var(--out-bg);color:var(--out)') + '">' + (urgent ? '\u26a0 ' : '') + esc(nextText(nb)) + '</div>' : '') +
+      HK.map(function (k) {
+        var on = b.hk && b.hk[k[0]];
+        return '<button class="hkitem' + (on ? ' done' : '') + '" data-action="hk" data-id="' + b.id + '" data-k="' + k[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="box">\u2713</span><span class="nm">' + esc(k[1]) + '</span>' + (on ? '<span class="tm">' + esc(stampText(on)) + '</span>' : '') + '</button>';
+      }).join('') +
+      '<button class="btn primary" style="width:100%;margin-top:4px" data-action="hkAll" data-id="' + b.id + '">All done: room is ready</button>' +
+      (checkinId ? '<button class="btn" style="width:100%;margin-top:8px" data-action="checkinForce" data-id="' + checkinId + '">Check in anyway</button>' : '');
+    $('sheetOverlay').hidden = false;
+  }
+  function hkDone(b, room) {
+    persist(); render();
+    if (!prepFor(room)) { closeSheet(); toast('Room ' + room + ' is ready for the next guest.'); } else openPrep(room);
+  }
+  function toggleHk(id, k) {
+    state.bookings.forEach(function (b) {
+      if (b.id !== id) return;
+      b.hk = b.hk || {};
+      if (b.hk[k]) delete b.hk[k]; else b.hk[k] = new Date().toISOString();
+      hkDone(b, b.roomNumber);
+    });
+  }
+  function markAllHk(id) {
+    state.bookings.forEach(function (b) {
+      if (b.id !== id) return;
+      b.hk = b.hk || {};
+      HK.forEach(function (k) { if (!b.hk[k[0]]) b.hk[k[0]] = new Date().toISOString(); });
+      hkDone(b, b.roomNumber);
+    });
   }
   function renderToday() {
     var t = ymd(new Date()), conf = configuredRooms(), arr = 0, dep = 0, busy = {};
@@ -779,7 +885,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var rooms = allRooms();
     if (state.filter !== 'all') rooms = rooms.filter(function (r) { return r === state.filter; });
     $('gridBody').innerHTML = rooms.map(function (room) {
-      return '<tr><td class="roomcol" title="Room ' + esc(room) + '">' + esc(room) + '</td>' + days.map(function (d) {
+      var pfr = prepFor(room);
+      return '<tr><td class="roomcol" title="Room ' + esc(room) + (pfr ? ' needs preparation' : '') + '"' + (pfr ? ' data-action="prep" data-room="' + esc(room) + '" style="cursor:pointer"' : '') + '>' + esc(room) + (pfr ? '<span class="prepdot">PREP</span>' : '') + '</td>' + days.map(function (d) {
         return '<td>' + cellHtml(room, ymd(d)) + '</td>';
       }).join('') + '</tr>';
     }).join('');
@@ -794,6 +901,12 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     return '<span class="badge">Past</span>';
   }
 
+  function notReadyHtml(b, t) {
+    if (b.checkedInAt || b.checkedOutAt || b.checkIn > t) return '';
+    var pf = prepFor(b.roomNumber);
+    if (!pf || pf.b.id === b.id) return '';
+    return '<div class="timewarn" style="margin:6px 0 0">\u26a0 Room not ready: ' + esc(hkNames(pf.missing)) + ' still to do. <button class="btn small" data-action="prep" data-room="' + esc(b.roomNumber) + '">Prepare</button></div>';
+  }
   function renderList() {
     var t = ymd(new Date());
     var list = state.bookings.filter(function (b) {
@@ -812,7 +925,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       var asking = state.confirmDelete === b.id, past = isDeparted(b) || b.checkOut < t, ciHtml = checkinHtml(b, t, past) + checkoutHtml(b, t);
       return '<div class="card bk' + (past ? ' past' : '') + (timeClashes(b).length ? ' clash' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
-        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + '<div class="dates">' + (isDayUse(b) ? esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) : 'Planned: in ' + esc(timeFor(b, 'in').replace(' (standard)', '')) + ' &middot; out ' + esc(timeFor(b, 'out').replace(' (standard)', ''))) + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
+        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + '<div class="dates">' + (isDayUse(b) ? esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) : 'Planned: in ' + esc(timeFor(b, 'in').replace(' (standard)', '')) + ' &middot; out ' + esc(timeFor(b, 'out').replace(' (standard)', ''))) + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + notReadyHtml(b, t) + ciHtml + '</div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
           : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
@@ -835,7 +948,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('stVacant').textContent = vacant.length;
     $('stOcc').textContent = occupied.length;
     $('vacantChips').innerHTML = vacant.length ? vacant.map(function (r) {
-      return '<button class="chip vac" data-action="chipBook" data-room="' + esc(r) + '"><b>' + esc(r) + '</b><small>' + (leaving[r] ? 'Free after check-out' : 'Tap to book') + '</small></button>';
+      return '<button class="chip vac" data-action="chipBook" data-room="' + esc(r) + '"><b>' + esc(r) + '</b><small>' + (prepFor(r) ? '<span style="color:var(--out);font-weight:600">\u26a0 Needs prep</span>' : (leaving[r] ? 'Free after check-out' : 'Tap to book')) + '</small></button>';
     }).join('') : '<div class="empty" style="grid-column:1/-1;padding:8px">No vacant rooms on this date.</div>';
     $('vacantNote').textContent = vacant.length ? 'Vacant on ' + fmt(d) + ': ' + vacant.join(', ') : '';
     $('occChips').innerHTML = occupied.length ? occupied.map(function (r) {
@@ -867,7 +980,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function openSheet(room, day) {
     var bs = bookingsOn(room, day), free = !nightBooking(room, day);
     $('sheetTitle').textContent = 'Room ' + room + ' · ' + fmtLong(day);
-    $('sheetBody').innerHTML = bs.map(function (b) {
+    var pfs = prepFor(room);
+    $('sheetBody').innerHTML = (pfs ? '<div class="timewarn" style="display:flex;gap:8px;align-items:center;justify-content:space-between"><span>\u26a0 Room not ready: ' + esc(hkNames(pfs.missing)) + ' still to do.</span><button class="btn small" data-action="prep" data-room="' + esc(room) + '">Prepare</button></div>' : '') + bs.map(function (b) {
       var st = statusOf(b, day);
       var cin = b.checkedInAt ? '<button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo check-in</button>'
         : (b.checkIn === ymd(new Date()) && day === b.checkIn ? '<button class="btn small primary" data-action="checkin" data-id="' + b.id + '">Check in</button>' : '');
@@ -934,6 +1048,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       var hits = timeClashes(c);
       if (hits.length) msg = '\u26a0 Time clash in room ' + c.roomNumber + ' with ' + hits.map(function (o) { return o.guestName + (timeNote(o) ? ' (' + timeNote(o) + ')' : ''); }).join(', ') + '. You can still save; it will be highlighted.';
     }
+    if (c.roomNumber && c.checkIn && c.checkIn <= ymd(new Date())) {
+      var pf = prepFor(c.roomNumber);
+      if (pf && pf.b.id !== c.id) msg += (msg ? '\n' : '') + '\u26a0 Room ' + c.roomNumber + ' is not ready yet (' + hkNames(pf.missing) + ' still to do). Prepare it before the guest arrives.';
+    }
     w.textContent = msg; w.hidden = !msg;
   }
   function submitBooking(ev) {
@@ -995,10 +1113,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var sorted = state.bookings.slice().sort(function (a, b) {
       return cmpRoom(a.roomNumber, b.roomNumber) || (a.checkIn < b.checkIn ? -1 : 1);
     });
-    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in', 'Check-in time', 'Check-out time', 'Checked out']];
-    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '', b.inTime || '', b.outTime || '', b.checkedOutAt ? stampLocal(b.checkedOutAt) : '']); });
+    var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in', 'Check-in time', 'Check-out time', 'Checked out', 'Room prep done']];
+    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '', b.inTime || '', b.outTime || '', b.checkedOutAt ? stampLocal(b.checkedOutAt) : '', b.hk ? (HK.filter(function (k) { return b.hk[k[0]]; }).map(function (k) { return k[1]; }).join('; ') || 'none') : '']); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }, { wch: 14 }, { wch: 15 }, { wch: 17 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }, { wch: 14 }, { wch: 15 }, { wch: 17 }, { wch: 34 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
 
     var days = [];
@@ -1083,12 +1201,13 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           }
         }
         /* columns by header name, so files exported before Company existed still import */
-        var cG = 1, cC = -1, cI = 2, cO = 3, cK = -1, cTi = -1, cTo = -1, cKo = -1;
+        var cG = 1, cC = -1, cI = 2, cO = 3, cK = -1, cTi = -1, cTo = -1, cKo = -1, cHk = -1;
         if (hdr) {
           if (hdr.indexOf('guest') >= 0) cG = hdr.indexOf('guest');
           cC = hdr.indexOf('company');
           cK = hdr.indexOf('checked in');
           cKo = hdr.indexOf('checked out');
+          cHk = hdr.indexOf('room prep done');
           cTi = hdr.indexOf('check-in time');
           cTo = hdr.indexOf('check-out time');
           if (hdr.indexOf('check-in') >= 0) cI = hdr.indexOf('check-in');
@@ -1118,6 +1237,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           if (cKo >= 0 && row[cKo]) {
             var ko = row[cKo] instanceof Date ? row[cKo] : new Date(String(row[cKo]).trim().replace(' ', 'T'));
             if (!isNaN(ko)) rec.checkedOutAt = ko.toISOString();
+          }
+          if (cHk >= 0 && row[cHk]) {
+            var hv = String(row[cHk]).trim().toLowerCase(), stamp = rec.checkedOutAt || new Date().toISOString();
+            rec.hk = {};
+            HK.forEach(function (k) { if (hv.indexOf(k[1].toLowerCase()) >= 0) rec.hk[k[0]] = stamp; });
           }
           out.push(rec);
         }
@@ -1192,7 +1316,15 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         persist(); render(); toast('Booking deleted.');
         break;
       case 'closeModal': closeModal(); break;
-      case 'checkin': setCheckin(id, true); break;
+      case 'checkin':
+        var cb = null;
+        state.bookings.forEach(function (x) { if (x.id === id) cb = x; });
+        if (cb && prepFor(cb.roomNumber)) openPrep(cb.roomNumber, id); else setCheckin(id, true);
+        break;
+      case 'checkinForce': setCheckin(id, true); break;
+      case 'prep': openPrep(room); break;
+      case 'hk': toggleHk(id, el.getAttribute('data-k')); break;
+      case 'hkAll': markAllHk(id); break;
       case 'undoCheckin': setCheckin(id, false); break;
       case 'checkout': setCheckout(id, true); break;
       case 'undoCheckout': setCheckout(id, false); break;
@@ -1278,11 +1410,12 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     state.bookings.forEach(function (b) {
       if (b.id !== id) return;
       hit = b;
-      if (on) b.checkedOutAt = new Date().toISOString(); else delete b.checkedOutAt;
+      if (on) { b.checkedOutAt = new Date().toISOString(); b.hk = {}; } else { delete b.checkedOutAt; delete b.hk; }
     });
     if (!hit) return;
     persist(); closeSheet(); render();
-    toast(on ? 'Room ' + hit.roomNumber + ' checked out.' : 'Check-out undone for room ' + hit.roomNumber + '.');
+    toast(on ? 'Room ' + hit.roomNumber + ' checked out. Prepare it before the next guest.' : 'Check-out undone for room ' + hit.roomNumber + '.');
+    if (on) openPrep(hit.roomNumber);
   }
   function setCheckin(id, on) {
     var hit = null;
