@@ -204,9 +204,18 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .dialog .acts .btn { flex: 1; }
 .quick { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .quick span { color: var(--muted); font-size: 12px; margin-right: 2px; }
-.sheetrow { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.sheetrow .g { font-weight: 600; overflow-wrap: anywhere; }
-.sheetrow .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.sheetrow { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; display: block; }
+.sheetrow .top { display: flex; align-items: flex-start; gap: 10px; }
+.sheetrow .top > div { min-width: 0; flex: 1; }
+.sheetrow .g { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.sheetrow .d { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.sheetrow .info { margin-top: 10px; display: grid; gap: 4px; font-size: 13px; }
+.sheetrow .info div { display: flex; gap: 8px; }
+.sheetrow .info span.k { flex: none; width: 82px; color: var(--muted); }
+.sheetrow .info span.v { min-width: 0; overflow-wrap: anywhere; }
+.sheetrow .timewarn { margin: 10px 0 0; }
+.sheetrow .acts2 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sheetrow .acts2 .btn { flex: 1 1 auto; }
 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); max-width: min(92vw, 460px); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 60; }
 @media (prefers-reduced-motion: no-preference) { .toast { animation: rise 0.18s ease-out; } }
@@ -545,6 +554,13 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function isDeparted(b) { return !!b.checkedOutAt; }
   /* arrival follows the Check in button only */
   function isArrived(b) { return !!b.checkedInAt; }
+  /* the stay's times for the day sheet: own time, else the standard time (marked), else a dash */
+  function timeFor(b, which) {
+    var own = which === 'in' ? b.inTime : b.outTime;
+    if (own) return fmtTime(own);
+    if (isDayUse(b)) return 'time not set';
+    return fmtTime(which === 'in' ? stdIn() : stdOut()) + ' (standard)';
+  }
   function isDayUse(b) { return b.checkIn === b.checkOut; }
   function stayWord(b) { var n = nights(b); return isDayUse(b) ? 'Same day' : n + (n === 1 ? ' night' : ' nights'); }
   /* does a stay ci..co clash with booking b? Normal stays may touch at the ends (back-to-back);
@@ -775,7 +791,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       var asking = state.confirmDelete === b.id, past = isDeparted(b) || b.checkOut < t, ciHtml = checkinHtml(b, t, past) + checkoutHtml(b, t);
       return '<div class="card bk' + (past ? ' past' : '') + (timeClashes(b).length ? ' clash' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
-        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + (timeNote(b) ? '<div class="dates">' + esc(timeNote(b)) + '</div>' : '') + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
+        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + '<div class="dates">' + (isDayUse(b) ? esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) : 'In ' + esc(timeFor(b, 'in').replace(' (standard)', '')) + ' &middot; Out ' + esc(timeFor(b, 'out').replace(' (standard)', ''))) + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
           : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
@@ -836,9 +852,17 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         : (b.checkIn === ymd(new Date()) && day === b.checkIn ? '<button class="btn small primary" data-action="checkin" data-id="' + b.id + '">Check in</button>' : '');
       var cout = b.checkedOutAt ? '<button class="btn small" data-action="undoCheckout" data-id="' + b.id + '">Undo check-out</button>'
         : (b.checkOut <= ymd(new Date()) && day === b.checkOut ? '<button class="btn small primary" data-action="checkout" data-id="' + b.id + '">Check out</button>' : '');
-      return '<div class="sheetrow">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') +
-        '<div class="d">' + st.label.charAt(0).toUpperCase() + st.label.slice(1) + ' &middot; ' + fmt(b.checkIn) + ' to ' + fmt(b.checkOut) + (timeNote(b) ? ' &middot; ' + esc(timeNote(b)) : '') + (b.checkedInAt ? ' &middot; Checked in ' + esc(stampText(b.checkedInAt)) : '') + (b.checkedOutAt ? ' &middot; Checked out ' + esc(stampText(b.checkedOutAt)) : '') + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + '</div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' + cin + cout + '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div></div>';
+      var clashes = timeClashes(b);
+      var info = isDayUse(b)
+        ? '<div><span class="k">Same day</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) + '</span></div>'
+        : '<div><span class="k">Check-in</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + '</span></div>' +
+          '<div><span class="k">Check-out</span><span class="v">' + esc(fmt(b.checkOut)) + ', ' + esc(timeFor(b, 'out')) + '</span></div>';
+      if (b.checkedInAt) info += '<div><span class="k">Checked in</span><span class="v">' + esc(stampText(b.checkedInAt)) + '</span></div>';
+      if (b.checkedOutAt) info += '<div><span class="k">Checked out</span><span class="v">' + esc(stampText(b.checkedOutAt)) + '</span></div>';
+      return '<div class="sheetrow"><div class="top">' + logoHtml(b.company) + '<div><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') + '</div>' + stayBadge(b, ymd(new Date())) + '</div>' +
+        '<div class="info">' + info + '</div>' +
+        (clashes.length ? '<div class="timewarn">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') +
+        '<div class="acts2">' + cin + cout + '<button class="btn small" data-action="sheetEdit" data-id="' + b.id + '">Edit</button></div></div>';
     }).join('') + (free
       ? '<button class="btn primary" style="width:100%" data-action="sheetBook" data-room="' + esc(room) + '" data-day="' + day + '">Book this room from ' + esc(fmtDay(parseYmd(day))) + '</button>'
       : '');
