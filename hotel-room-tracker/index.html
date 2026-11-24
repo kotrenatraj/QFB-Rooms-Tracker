@@ -121,6 +121,10 @@ label.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5p
 .hkitem .tm { font-size: 12px; color: var(--muted); }
 .hkitem.done { background: var(--in-bg); border-color: var(--in); }
 .hkitem.done .box { background: var(--in); border-color: var(--in); color: var(--accent-fg); }
+.ckrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.ckrow .field { flex: 1; min-width: 0; }
+.ckrow .btn { flex: none; width: 34px; min-width: 34px; padding: 0; }
+.ckrow { gap: 4px; }
 .thisweek { display: flex; justify-content: center; margin-bottom: 6px; }
 .weeknav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .weeknav .btn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
@@ -406,6 +410,15 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         </div>
         <div class="hint">Used when a booking has no time of its own, to spot same-day clashes (a guest leaving after the next one is due in).</div>
       </div>
+      <div class="row">
+        <label class="lbl">Room preparation checklist</label>
+        <div id="sCheckList"></div>
+        <div class="toolbar" style="margin:8px 0 6px">
+          <button type="button" class="btn small" data-action="ckAdd">+ Add task</button>
+          <button type="button" class="btn small" data-action="ckReset">Reset to default</button>
+        </div>
+        <div class="hint">Shown as a tick list after every check-out. Use the arrows to reorder. Changes apply from the next check-out; a room already being prepared keeps the list it started with. Remember to tap Save settings.</div>
+      </div>
       <button class="btn primary" data-action="saveSettings">Save settings</button>
     </div>
     <div class="card settings">
@@ -508,6 +521,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     vacDate: ymd(new Date()),
     confirmDelete: null,
     pendingImport: null,
+    ckDraft: [],
     rangeFrom: ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     rangeTo: ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)),
     shareMsg: ''
@@ -634,6 +648,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         state.settings.roomNumbers = Array.isArray(s.roomNumbers) ? s.roomNumbers.map(String) : [];
         if (tmin(s.stdIn) !== null) state.settings.stdIn = s.stdIn;
         if (tmin(s.stdOut) !== null) state.settings.stdOut = s.stdOut;
+        if (Array.isArray(s.checklist)) state.settings.checklist = s.checklist.filter(function (i) { return i && i.k && i.l; });
       }
     } catch (e) {}
   }
@@ -738,12 +753,22 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('nightsRangeSub').textContent = r ? (r.days + (r.days === 1 ? ' day' : ' days') + ' \u00b7 ' + nightsText(r)) : (state.rangeFrom && state.rangeTo ? 'To must be on or after From' : '');
   }
   /* ---------- room preparation after check-out ---------- */
-  var HK = [['cleaning', 'Room cleaned'], ['bedding', 'Bedding changed'], ['toiletries', 'Toiletries arranged'], ['towels', 'Towels arranged'],
+  var HK_DEFAULT = [['cleaning', 'Room cleaned'], ['bedding', 'Bedding changed'], ['toiletries', 'Toiletries arranged'], ['towels', 'Towels arranged'],
     ['bottles', 'Drinking water bottles placed'], ['teacoffee', 'Tea/coffee and sugar sachets stocked'], ['kettle', 'Water kettle checked'],
     ['ac', 'AC checked'], ['geyser', 'Geyser checked'], ['waterquality', 'Bathroom water quality checked']];
-  /* checklists started before the extra tasks existed (no _v marker) keep only the original four */
-  function hkItems(b) { return b.hk && b.hk._v >= 2 ? HK : HK.slice(0, 4); }
-  function hkNewList() { return { _v: 2 }; }
+  /* the checklist comes from Settings; the built-in tasks are the starting point */
+  function hkList() {
+    var c = state.settings.checklist;
+    return Array.isArray(c) ? c.map(function (i) { return [i.k, i.l]; }) : HK_DEFAULT;
+  }
+  /* the tasks this booking's check-out has to complete: the list as it was at check-out, minus tasks since removed in Settings */
+  function hkItems(b) {
+    var keys = b.hk && b.hk._keys ? b.hk._keys : HK_DEFAULT.slice(0, b.hk && b.hk._v >= 2 ? 10 : 4).map(function (k) { return k[0]; });
+    var cur = {};
+    hkList().forEach(function (k) { cur[k[0]] = k; });
+    return keys.filter(function (k) { return cur[k]; }).map(function (k) { return cur[k]; });
+  }
+  function hkNewList() { return { _v: 2, _keys: hkList().map(function (k) { return k[0]; }) }; }
   function hkMissing(b) { return hkItems(b).filter(function (k) { return !(b.hk && b.hk[k[0]]); }); }
   function hkLow(l) { return /^[A-Z]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1); }
   function hkNames(list, max) {
@@ -972,6 +997,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('sRooms').value = state.settings.roomNumbers.join(', ');
     $('sStdIn').value = stdIn();
     $('sStdOut').value = stdOut();
+    state.ckDraft = hkList().map(function (k) { return { k: k[0], l: k[1] }; });
+    renderChecklistEditor();
   }
 
   function switchTab(t) {
@@ -1103,6 +1130,40 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 
   /* ---------- settings ---------- */
+  /* ---------- checklist editor (Settings) ---------- */
+  function ckRead() {
+    var rows = document.querySelectorAll('#sCheckList input');
+    for (var i = 0; i < rows.length && i < state.ckDraft.length; i++) state.ckDraft[i].l = rows[i].value;
+  }
+  function ckClean() {
+    ckRead();
+    var seen = {}, out = [];
+    state.ckDraft.forEach(function (i) {
+      var l = String(i.l || '').replace(/\|/g, '/').replace(/\s+/g, ' ').trim();
+      if (!l || seen[i.k]) return;
+      seen[i.k] = true;
+      out.push({ k: i.k, l: l });
+    });
+    return out;
+  }
+  function renderChecklistEditor() {
+    $('sCheckList').innerHTML = state.ckDraft.map(function (i, n) {
+      return '<div class="ckrow"><input class="field" maxlength="60" value="' + esc(i.l) + '" aria-label="Task ' + (n + 1) + '" placeholder="Task name">' +
+        '<button type="button" class="btn small" data-action="ckUp" data-i="' + n + '" aria-label="Move up"' + (n === 0 ? ' disabled' : '') + '>\u2191</button>' +
+        '<button type="button" class="btn small" data-action="ckDown" data-i="' + n + '" aria-label="Move down"' + (n === state.ckDraft.length - 1 ? ' disabled' : '') + '>\u2193</button>' +
+        '<button type="button" class="btn small" data-action="ckDel" data-i="' + n + '" aria-label="Remove task">\u2715</button></div>';
+    }).join('') || '<div class="hint">No tasks. Nothing will be asked after check-out.</div>';
+  }
+  function ckAction(act, n) {
+    ckRead();
+    if (act === 'ckAdd') state.ckDraft.push({ k: 'c' + Date.now().toString(36) + state.ckDraft.length, l: '' });
+    if (act === 'ckDel') state.ckDraft.splice(n, 1);
+    if (act === 'ckUp' && n > 0) state.ckDraft.splice(n - 1, 0, state.ckDraft.splice(n, 1)[0]);
+    if (act === 'ckDown' && n < state.ckDraft.length - 1) state.ckDraft.splice(n + 1, 0, state.ckDraft.splice(n, 1)[0]);
+    if (act === 'ckReset') state.ckDraft = HK_DEFAULT.map(function (k) { return { k: k[0], l: k[1] }; });
+    renderChecklistEditor();
+    if (act === 'ckAdd') { var ins = document.querySelectorAll('#sCheckList input'); if (ins.length) ins[ins.length - 1].focus(); }
+  }
   function saveSettings() {
     var list = $('sRooms').value.split(/[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
     var seen = {}, rooms = [];
@@ -1110,7 +1171,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var total = parseInt($('sTotal').value, 10);
     if (rooms.length) total = rooms.length;
     if (!total || total < 1 || total > 500) { toast('Enter a total between 1 and 500 rooms.'); return; }
-    state.settings = { totalRooms: total, roomNumbers: rooms, stdIn: tmin($('sStdIn').value) !== null ? $('sStdIn').value : '12:00', stdOut: tmin($('sStdOut').value) !== null ? $('sStdOut').value : '11:00' };
+    state.settings = { totalRooms: total, roomNumbers: rooms, stdIn: tmin($('sStdIn').value) !== null ? $('sStdIn').value : '12:00', stdOut: tmin($('sStdOut').value) !== null ? $('sStdOut').value : '11:00', checklist: ckClean() };
     persist();
     renderSettings();
     toast('Saved. ' + total + ' rooms in your hotel.');
@@ -1147,7 +1208,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var ws3 = XLSX.utils.aoa_to_sheet([
       ['Setting', 'Value'],
       ['Total rooms', state.settings.totalRooms],
-      ['Room numbers', state.settings.roomNumbers.join(', ')]
+      ['Room numbers', state.settings.roomNumbers.join(', ')],
+      ['Checklist', hkList().map(function (k) { return k[1]; }).join(' | ')]
     ]);
     ws3['!cols'] = [{ wch: 16 }, { wch: 60 }];
     XLSX.utils.book_append_sheet(wb, ws3, 'Settings');
@@ -1250,21 +1312,27 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           if (cHk >= 0 && row[cHk]) {
             var hv = String(row[cHk]).trim().toLowerCase(), stamp = rec.checkedOutAt || new Date().toISOString();
             rec.hk = hkNewList();
-            HK.forEach(function (k) { if (hv.indexOf(k[1].toLowerCase()) >= 0) rec.hk[k[0]] = stamp; });
+            hkList().forEach(function (k) { if (hv.indexOf(k[1].toLowerCase()) >= 0) rec.hk[k[0]] = stamp; });
           }
           out.push(rec);
         }
         var settings = null;
         if (wb.Sheets['Settings']) {
           var srows = XLSX.utils.sheet_to_json(wb.Sheets['Settings'], { header: 1, raw: true, defval: '' });
-          var total = 0, nums = [];
+          var total = 0, nums = [], ck = null;
           srows.forEach(function (sr) {
             var k = String(sr[0]).trim().toLowerCase();
             if (k === 'total rooms') total = parseInt(sr[1], 10) || 0;
+            if (k === 'checklist') ck = String(sr[1]).split('|').map(function (x) { return x.trim(); }).filter(Boolean);
             if (k === 'room numbers') nums = String(sr[1]).split(/[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
           });
           if (nums.length) total = nums.length;
           if (total > 0) settings = { totalRooms: total, roomNumbers: nums };
+          if (settings && ck) {
+            var byLabel = {};
+            hkList().forEach(function (k) { byLabel[k[1].toLowerCase()] = k[0]; });
+            settings.checklist = ck.map(function (l, n) { return { k: byLabel[l.toLowerCase()] || 'c' + Date.now().toString(36) + n, l: l }; });
+          }
         }
         if (!out.length) { toast('No valid bookings found in that file.'); return; }
         state.pendingImport = { name: file.name, bookings: out, skipped: skipped, settings: settings };
@@ -1340,6 +1408,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'share': openShare(); break;
       case 'shareCopyMsg': copyText(state.shareMsg, 'Message copied.'); break;
       case 'saveSettings': saveSettings(); break;
+      case 'ckAdd': case 'ckReset': ckAction(a); break;
+      case 'ckDel': case 'ckUp': case 'ckDown': ckAction(a, +el.getAttribute('data-i')); break;
       case 'export': doExport(); break;
       case 'import': $('importFile').click(); break;
       case 'importYes': applyImport(); break;
@@ -1423,7 +1493,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     });
     if (!hit) return;
     persist(); closeSheet(); render();
-    toast(on ? 'Room ' + hit.roomNumber + ' checked out. Prepare it before the next guest.' : 'Check-out undone for room ' + hit.roomNumber + '.');
+    toast(on ? 'Room ' + hit.roomNumber + ' checked out.' + (hkList().length ? ' Prepare it before the next guest.' : '') : 'Check-out undone for room ' + hit.roomNumber + '.');
     if (on) openPrep(hit.roomNumber);
   }
   function setCheckin(id, on) {
