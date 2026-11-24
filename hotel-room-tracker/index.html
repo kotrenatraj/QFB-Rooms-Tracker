@@ -107,6 +107,7 @@ label.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5p
 .nights .range > div { min-width: 0; }
 .nights .range input.field { min-width: 0; max-width: 100%; padding-left: 8px; padding-right: 8px; }
 .nights hr { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+.thisweek { display: flex; justify-content: center; margin-bottom: 6px; }
 .weeknav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .weeknav .btn { min-width: 44px; padding-left: 10px; padding-right: 10px; }
 .weeknav .label { flex: 1; text-align: center; font-weight: 600; min-width: 0; }
@@ -313,6 +314,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     </div>
     <div class="todayhead"><b id="todayDate"></b><span>Today's snapshot &middot; stays the same when you change the week</span></div>
     <div class="todaystrip" id="todayStrip"></div>
+    <div class="thisweek"><button class="btn small" data-action="today">This week</button></div>
     <div class="weeknav">
       <button class="btn" data-action="prevWeek" aria-label="Previous week">&#9664;</button>
       <div class="label" id="weekLabel"></div>
@@ -320,9 +322,6 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     </div>
     <div class="toolbar filters">
       <select class="field grow" id="roomFilter" aria-label="Show room"></select>
-      <button class="btn" data-action="today">This week</button>
-      <button class="btn" data-action="export">Export</button>
-      <button class="btn" data-action="import">Import</button>
     </div>
     <div class="card grid-wrap" id="gridWrap">
       <table class="grid">
