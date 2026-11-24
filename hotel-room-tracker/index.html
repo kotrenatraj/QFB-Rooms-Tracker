@@ -502,7 +502,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   /* ---------- times and same-day clashes ---------- */
   function tmin(t) { var m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; }
   function fmtTime(t) { var m = tmin(t); if (m === null) return ''; var h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + (h < 12 ? ' am' : ' pm'); }
-  function stdIn() { return state.settings.stdIn || '14:00'; }
+  function stdIn() { return state.settings.stdIn || '12:00'; }
   function stdOut() { return state.settings.stdOut || '11:00'; }
   function timeNote(b) {
     var a = b.inTime ? fmtTime(b.inTime) : '', o = b.outTime ? fmtTime(b.outTime) : '';
@@ -551,17 +551,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     if (o === null) { if (b.checkIn === b.checkOut) return false; o = tmin(stdOut()); }
     return now.getHours() * 60 + now.getMinutes() >= o;
   }
-  /* has the guest arrived? marked as checked in, an earlier arrival date, or the check-in time has passed today */
-  function isArrived(b, now) {
-    now = now || new Date();
-    if (b.checkedInAt) return true;
-    var t = ymd(now);
-    if (b.checkIn < t) return true;
-    if (b.checkIn > t) return false;
-    var i = tmin(b.inTime);
-    if (i === null) { if (b.checkIn === b.checkOut) return false; i = tmin(stdIn()); }
-    return now.getHours() * 60 + now.getMinutes() >= i;
-  }
+  /* arrival follows the Check in button only */
+  function isArrived(b) { return !!b.checkedInAt; }
   function isDayUse(b) { return b.checkIn === b.checkOut; }
   function stayWord(b) { var n = nights(b); return isDayUse(b) ? 'Same day' : n + (n === 1 ? ' night' : ' nights'); }
   /* does a stay ci..co clash with booking b? Normal stays may touch at the ends (back-to-back);
@@ -941,7 +932,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var total = parseInt($('sTotal').value, 10);
     if (rooms.length) total = rooms.length;
     if (!total || total < 1 || total > 500) { toast('Enter a total between 1 and 500 rooms.'); return; }
-    state.settings = { totalRooms: total, roomNumbers: rooms, stdIn: tmin($('sStdIn').value) !== null ? $('sStdIn').value : '14:00', stdOut: tmin($('sStdOut').value) !== null ? $('sStdOut').value : '11:00' };
+    state.settings = { totalRooms: total, roomNumbers: rooms, stdIn: tmin($('sStdIn').value) !== null ? $('sStdIn').value : '12:00', stdOut: tmin($('sStdOut').value) !== null ? $('sStdOut').value : '11:00' };
     persist();
     renderSettings();
     toast('Saved. ' + total + ' rooms in your hotel.');
