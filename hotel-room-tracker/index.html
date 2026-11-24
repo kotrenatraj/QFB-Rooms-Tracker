@@ -789,6 +789,22 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var movedIn = state.bookings.some(function (b) { return String(b.roomNumber) === room && b.checkedInAt && b.checkedInAt > last.checkedOutAt; });
     return movedIn ? null : { b: last, missing: missing };
   }
+  /* the stay just before a booking in the same room: the check-out whose preparation that booking depends on */
+  function prevStay(room, checkIn, exceptId) {
+    var prev = null;
+    state.bookings.forEach(function (o) {
+      if (String(o.roomNumber) !== String(room) || o.id === exceptId || o.checkOut > checkIn) return;
+      if (!prev || o.checkOut > prev.checkOut || (o.checkOut === prev.checkOut && o.checkIn > prev.checkIn)) prev = o;
+    });
+    return prev;
+  }
+  /* a booking is held up only by the preparation of its own previous check-out */
+  function prepGate(room, checkIn, exceptId) {
+    var p = prevStay(room, checkIn, exceptId);
+    if (!p || !p.checkedOutAt || !p.hk) return null;
+    var missing = hkMissing(p);
+    return missing.length ? { b: p, missing: missing } : null;
+  }
   function nextArrival(room) {
     var t = ymd(new Date()), nb = null;
     state.bookings.forEach(function (b) {
@@ -826,9 +842,10 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         '<button class="btn small primary" data-action="prep" data-room="' + esc(x.room) + '">Open</button></div>';
     }).join('') + (list.length > 6 ? '<div class="d" style="margin-top:6px">+ ' + (list.length - 6) + ' more rooms (look for PREP in the room column)</div>' : '');
   }
-  function openPrep(room, checkinId) {
-    var pf = prepFor(room);
-    if (!pf) { closeSheet(); return; }
+  function openPrepFor(b, checkinId) { openPrep(b.roomNumber, checkinId, b); }
+  function openPrep(room, checkinId, only) {
+    var pf = only ? { b: only, missing: hkMissing(only) } : prepFor(room);
+    if (!pf || !pf.missing.length) { closeSheet(); return; }
     var b = pf.b, nb = nextArrival(room), urgent = nb && nb.checkIn === ymd(new Date());
     $('sheetTitle').textContent = 'Prepare Room ' + room;
     $('sheetBody').innerHTML =
@@ -936,10 +953,16 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 
   function notReadyHtml(b, t) {
-    if (b.checkedInAt || b.checkedOutAt || b.checkIn > t) return '';
-    var pf = prepFor(b.roomNumber);
-    if (!pf || pf.b.id === b.id) return '';
-    return '<div class="timewarn" style="margin:6px 0 0">\u26a0 Room not ready: ' + esc(hkNames(pf.missing)) + ' still to do. <button class="btn small" data-action="prep" data-room="' + esc(b.roomNumber) + '">Prepare</button></div>';
+    if (b.checkedInAt || b.checkedOutAt) return '';
+    if (b.checkIn > t) {
+      /* a reservation for a later date: the room is prepared after the previous guest checks out, not now */
+      var pv = prevStay(b.roomNumber, b.checkIn, b.id);
+      if (!pv || pv.checkedOutAt && !hkMissing(pv).length) return '';
+      return '<div class="d" style="margin-top:6px">Room prep follows ' + esc(pv.guestName) + '\'s check-out' + (pv.checkedOutAt ? ' (checklist pending)' : ' (' + esc(fmtDay(parseYmd(pv.checkOut))) + ')') + '.</div>';
+    }
+    var pf = prepGate(b.roomNumber, b.checkIn, b.id);
+    if (!pf) return '';
+    return '<div class="timewarn" style="margin:6px 0 0">\u26a0 Room not ready: ' + esc(hkNames(pf.missing, 3)) + ' still to do. <button class="btn small" data-action="prep" data-room="' + esc(b.roomNumber) + '">Prepare</button></div>';
   }
   function renderList() {
     var t = ymd(new Date());
@@ -982,7 +1005,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('stVacant').textContent = vacant.length;
     $('stOcc').textContent = occupied.length;
     $('vacantChips').innerHTML = vacant.length ? vacant.map(function (r) {
-      return '<button class="chip vac" data-action="chipBook" data-room="' + esc(r) + '"><b>' + esc(r) + '</b><small>' + (prepFor(r) ? '<span style="color:var(--out);font-weight:600">\u26a0 Needs prep</span>' : (leaving[r] ? 'Free after check-out' : 'Tap to book')) + '</small></button>';
+      return '<button class="chip vac" data-action="chipBook" data-room="' + esc(r) + '"><b>' + esc(r) + '</b><small>' + (d <= ymd(new Date()) && prepFor(r) ? '<span style="color:var(--out);font-weight:600">\u26a0 Needs prep</span>' : (leaving[r] ? 'Free after check-out' : 'Tap to book')) + '</small></button>';
     }).join('') : '<div class="empty" style="grid-column:1/-1;padding:8px">No vacant rooms on this date.</div>';
     $('vacantNote').textContent = vacant.length ? 'Vacant on ' + fmt(d) + ': ' + vacant.join(', ') : '';
     $('occChips').innerHTML = occupied.length ? occupied.map(function (r) {
@@ -1016,8 +1039,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function openSheet(room, day) {
     var bs = bookingsOn(room, day), free = !nightBooking(room, day);
     $('sheetTitle').textContent = 'Room ' + room + ' · ' + fmtLong(day);
-    var pfs = prepFor(room);
-    $('sheetBody').innerHTML = (pfs ? '<div class="timewarn" style="display:flex;gap:8px;align-items:center;justify-content:space-between"><span>\u26a0 Room not ready: ' + esc(hkNames(pfs.missing)) + ' still to do.</span><button class="btn small" data-action="prep" data-room="' + esc(room) + '">Prepare</button></div>' : '') + bs.map(function (b) {
+    var pfs = day <= ymd(new Date()) ? prepFor(room) : null;
+    $('sheetBody').innerHTML = (pfs ? '<div class="timewarn" style="display:flex;gap:8px;align-items:center;justify-content:space-between"><span>\u26a0 Room not ready: ' + esc(hkNames(pfs.missing, 3)) + ' still to do.</span><button class="btn small" data-action="prep" data-room="' + esc(room) + '">Prepare</button></div>' : '') + bs.map(function (b) {
       var st = statusOf(b, day);
       var cin = b.checkedInAt ? '<button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo check-in</button>'
         : (b.checkIn === ymd(new Date()) && day === b.checkIn ? '<button class="btn small primary" data-action="checkin" data-id="' + b.id + '">Check in</button>' : '');
@@ -1085,8 +1108,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       if (hits.length) msg = '\u26a0 Time clash in room ' + c.roomNumber + ' with ' + hits.map(function (o) { return o.guestName + (timeNote(o) ? ' (' + timeNote(o) + ')' : ''); }).join(', ') + '. You can still save; it will be highlighted.';
     }
     if (c.roomNumber && c.checkIn && c.checkIn <= ymd(new Date())) {
-      var pf = prepFor(c.roomNumber);
-      if (pf && pf.b.id !== c.id) msg += (msg ? '\n' : '') + '\u26a0 Room ' + c.roomNumber + ' is not ready yet (' + hkNames(pf.missing) + ' still to do). Prepare it before the guest arrives.';
+      var pf = prepGate(c.roomNumber, c.checkIn, c.id);
+      if (pf) msg += (msg ? '\n' : '') + '\u26a0 Room ' + c.roomNumber + ' is not ready yet (' + hkNames(pf.missing, 3) + ' still to do). Prepare it before the guest arrives.';
     }
     w.textContent = msg; w.hidden = !msg;
   }
@@ -1396,7 +1419,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       case 'checkin':
         var cb = null;
         state.bookings.forEach(function (x) { if (x.id === id) cb = x; });
-        if (cb && prepFor(cb.roomNumber)) openPrep(cb.roomNumber, id); else setCheckin(id, true);
+        if (cb && prepGate(cb.roomNumber, cb.checkIn, cb.id)) openPrepFor(prepGate(cb.roomNumber, cb.checkIn, cb.id).b, id); else setCheckin(id, true);
         break;
       case 'checkinForce': setCheckin(id, true); break;
       case 'prep': openPrep(room); break;
