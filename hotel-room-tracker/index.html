@@ -211,7 +211,7 @@ table.grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; 
 .sheetrow .d { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
 .sheetrow .info { margin-top: 10px; display: grid; gap: 4px; font-size: 13px; }
 .sheetrow .info div { display: flex; gap: 8px; }
-.sheetrow .info span.k { flex: none; width: 82px; color: var(--muted); }
+.sheetrow .info span.k { flex: none; width: 132px; color: var(--muted); }
 .sheetrow .info span.v { min-width: 0; overflow-wrap: anywhere; }
 .sheetrow .timewarn { margin: 10px 0 0; }
 .sheetrow .acts2 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -447,6 +447,14 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           <button type="button" class="btn small" data-action="nights" data-n="7">7</button>
         </div>
       </div>
+      <div class="fg" style="border-top:1px solid var(--line);padding-top:12px">
+        <div class="lbl">Actual times <span style="font-weight:400;color:var(--muted)">(optional)</span></div>
+        <label class="hint" for="fActIn" style="display:block;margin:0 0 3px">Actual check-in</label>
+        <input class="field" type="datetime-local" id="fActIn">
+        <label class="hint" for="fActOut" style="display:block;margin:8px 0 3px">Actual check-out</label>
+        <input class="field" type="datetime-local" id="fActOut">
+        <div class="hint">Filled in when you tap Check in or Check out. If a time is wrong, change it here; clear a box to remove it.</div>
+      </div>
       <div class="timewarn" id="timeWarn" hidden></div>
       <div class="acts">
         <button type="button" class="btn" data-action="closeModal">Cancel</button>
@@ -560,6 +568,15 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     if (own) return fmtTime(own);
     if (isDayUse(b)) return 'time not set';
     return fmtTime(which === 'in' ? stdIn() : stdOut()) + ' (standard)';
+  }
+  function toLocalInput(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : ymd(d) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function fromLocalInput(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    return isNaN(d) ? '' : d.toISOString();
   }
   function isDayUse(b) { return b.checkIn === b.checkOut; }
   function stayWord(b) { var n = nights(b); return isDayUse(b) ? 'Same day' : n + (n === 1 ? ' night' : ' nights'); }
@@ -791,7 +808,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       var asking = state.confirmDelete === b.id, past = isDeparted(b) || b.checkOut < t, ciHtml = checkinHtml(b, t, past) + checkoutHtml(b, t);
       return '<div class="card bk' + (past ? ' past' : '') + (timeClashes(b).length ? ' clash' : '') + '">' + logoHtml(b.company) + '<div style="min-width:0;flex:1"><div class="room">Room ' + esc(b.roomNumber) + ' ' + stayBadge(b, t) + '</div>' +
         '<div class="guest">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="co-line">' + esc(b.company) + '</div>' : '') +
-        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + '<div class="dates">' + (isDayUse(b) ? esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) : 'In ' + esc(timeFor(b, 'in').replace(' (standard)', '')) + ' &middot; Out ' + esc(timeFor(b, 'out').replace(' (standard)', ''))) + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
+        '<div class="dates">' + (isDayUse(b) ? fmt(b.checkIn) : fmt(b.checkIn) + ' to ' + fmt(b.checkOut)) + ' &middot; ' + stayWord(b) + '</div>' + '<div class="dates">' + (isDayUse(b) ? esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) : 'Planned: in ' + esc(timeFor(b, 'in').replace(' (standard)', '')) + ' &middot; out ' + esc(timeFor(b, 'out').replace(' (standard)', ''))) + '</div>' + (timeClashes(b).length ? '<div class="timewarn" style="margin:6px 0 0">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') + ciHtml + '</div>' +
         '<div>' + (asking
           ? '<div class="confirm">Delete this booking?</div><div class="acts"><button class="btn small danger" data-action="delYes" data-id="' + b.id + '">Delete</button><button class="btn small" data-action="delNo">Keep</button></div>'
           : '<div class="acts"><button class="btn small" data-action="edit" data-id="' + b.id + '">Edit</button><button class="btn small danger" data-action="del" data-id="' + b.id + '">Delete</button></div>') +
@@ -854,11 +871,11 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
         : (b.checkOut <= ymd(new Date()) && day === b.checkOut ? '<button class="btn small primary" data-action="checkout" data-id="' + b.id + '">Check out</button>' : '');
       var clashes = timeClashes(b);
       var info = isDayUse(b)
-        ? '<div><span class="k">Same day</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) + '</span></div>'
-        : '<div><span class="k">Check-in</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + '</span></div>' +
-          '<div><span class="k">Check-out</span><span class="v">' + esc(fmt(b.checkOut)) + ', ' + esc(timeFor(b, 'out')) + '</span></div>';
-      if (b.checkedInAt) info += '<div><span class="k">Checked in</span><span class="v">' + esc(stampText(b.checkedInAt)) + '</span></div>';
-      if (b.checkedOutAt) info += '<div><span class="k">Checked out</span><span class="v">' + esc(stampText(b.checkedOutAt)) + '</span></div>';
+        ? '<div><span class="k">Planned</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + ' to ' + esc(timeFor(b, 'out')) + '</span></div>'
+        : '<div><span class="k">Planned check-in</span><span class="v">' + esc(fmt(b.checkIn)) + ', ' + esc(timeFor(b, 'in')) + '</span></div>' +
+          '<div><span class="k">Planned check-out</span><span class="v">' + esc(fmt(b.checkOut)) + ', ' + esc(timeFor(b, 'out')) + '</span></div>';
+      if (b.checkedInAt) info += '<div><span class="k">Actual check-in</span><span class="v">' + esc(stampText(b.checkedInAt)) + '</span></div>';
+      if (b.checkedOutAt) info += '<div><span class="k">Actual check-out</span><span class="v">' + esc(stampText(b.checkedOutAt)) + '</span></div>';
       return '<div class="sheetrow"><div class="top">' + logoHtml(b.company) + '<div><div class="g">' + esc(b.guestName) + '</div>' + (b.company ? '<div class="d">' + esc(b.company) + '</div>' : '') + '</div>' + stayBadge(b, ymd(new Date())) + '</div>' +
         '<div class="info">' + info + '</div>' +
         (clashes.length ? '<div class="timewarn">\u26a0 Time clash with ' + esc(clashText(b)) + '</div>' : '') +
@@ -885,6 +902,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('fOut').value = b ? b.checkOut : ymd(addDays(parseYmd(ci), 1));
     $('fInT').value = b && b.inTime ? b.inTime : '';
     $('fOutT').value = b && b.outTime ? b.outTime : '';
+    $('fActIn').value = b && b.checkedInAt ? toLocalInput(b.checkedInAt) : '';
+    $('fActOut').value = b && b.checkedOutAt ? toLocalInput(b.checkedOutAt) : '';
     $('roomOptions').innerHTML = allRooms().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
     var seenCo = {};
     $('companyOptions').innerHTML = state.bookings.map(function (x) { return x.company || ''; }).filter(function (c) {
@@ -920,6 +939,8 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     if (co < ci) return formError('Check-out cannot be before check-in. For a same-day stay, use the same date for both.');
     var inT = $('fInT').value, outT = $('fOutT').value;
     if (ci === co && inT && outT && outT <= inT) return formError('For a same-day stay, check-out time must be after check-in time.');
+    var actIn = fromLocalInput($('fActIn').value), actOut = fromLocalInput($('fActOut').value);
+    if (actIn && actOut && actOut <= actIn) return formError('Actual check-out must be after actual check-in.');
     var clash = null;
     state.bookings.forEach(function (b) {
       if (b.id === state.editId || String(b.roomNumber) !== room) return;
@@ -931,11 +952,18 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     if (state.editId) {
       state.bookings = state.bookings.map(function (b) {
-        return b.id === state.editId ? Object.assign({}, b, { roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT }) : b;
+        if (b.id !== state.editId) return b;
+        var nb = Object.assign({}, b, { roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT });
+        if (actIn) nb.checkedInAt = actIn; else delete nb.checkedInAt;
+        if (actOut) nb.checkedOutAt = actOut; else delete nb.checkedOutAt;
+        return nb;
       });
       toast('Booking updated.');
     } else {
-      state.bookings.push({ id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT });
+      var nbk = { id: newId(), roomNumber: room, guestName: guest, company: company, checkIn: ci, checkOut: co, inTime: inT, outTime: outT };
+      if (actIn) nbk.checkedInAt = actIn;
+      if (actOut) nbk.checkedOutAt = actOut;
+      state.bookings.push(nbk);
       toast('Booking added to room ' + room + '.');
     }
     persist();
@@ -1232,12 +1260,12 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     return isNaN(d) ? '' : ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
   function checkinHtml(b, t, past) {
-    if (b.checkedInAt) return '<div class="ci-line"><span>Checked in ' + esc(stampText(b.checkedInAt)) + '</span><button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo</button></div>';
+    if (b.checkedInAt) return '<div class="ci-line"><span>Actual check-in ' + esc(stampText(b.checkedInAt)) + '</span><button class="btn small" data-action="undoCheckin" data-id="' + b.id + '">Undo</button></div>';
     if (b.checkIn === t && !past) return '<button class="btn small primary ci-btn" data-action="checkin" data-id="' + b.id + '">Check in</button>';
     return '';
   }
   function checkoutHtml(b, t) {
-    if (b.checkedOutAt) return '<div class="ci-line"><span>Checked out ' + esc(stampText(b.checkedOutAt)) + '</span><button class="btn small" data-action="undoCheckout" data-id="' + b.id + '">Undo</button></div>';
+    if (b.checkedOutAt) return '<div class="ci-line"><span>Actual check-out ' + esc(stampText(b.checkedOutAt)) + '</span><button class="btn small" data-action="undoCheckout" data-id="' + b.id + '">Undo</button></div>';
     if (b.checkOut <= t) return '<button class="btn small primary ci-btn" data-action="checkout" data-id="' + b.id + '">Check out</button>';
     return '';
   }
