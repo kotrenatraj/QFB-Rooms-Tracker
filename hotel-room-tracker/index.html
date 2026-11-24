@@ -551,6 +551,17 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     if (o === null) { if (b.checkIn === b.checkOut) return false; o = tmin(stdOut()); }
     return now.getHours() * 60 + now.getMinutes() >= o;
   }
+  /* has the guest arrived? marked as checked in, an earlier arrival date, or the check-in time has passed today */
+  function isArrived(b, now) {
+    now = now || new Date();
+    if (b.checkedInAt) return true;
+    var t = ymd(now);
+    if (b.checkIn < t) return true;
+    if (b.checkIn > t) return false;
+    var i = tmin(b.inTime);
+    if (i === null) { if (b.checkIn === b.checkOut) return false; i = tmin(stdIn()); }
+    return now.getHours() * 60 + now.getMinutes() >= i;
+  }
   function isDayUse(b) { return b.checkIn === b.checkOut; }
   function stayWord(b) { var n = nights(b); return isDayUse(b) ? 'Same day' : n + (n === 1 ? ' night' : ' nights'); }
   /* does a stay ci..co clash with booking b? Normal stays may touch at the ends (back-to-back);
@@ -695,7 +706,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   function renderToday() {
     var t = ymd(new Date()), conf = configuredRooms(), arr = 0, dep = 0, busy = {};
     state.bookings.forEach(function (b) {
-      if (b.checkIn === t && !b.checkedInAt) arr += 1;
+      if (b.checkIn === t && !isArrived(b)) arr += 1;
       if (b.checkOut === t && !isDeparted(b)) dep += 1;
       if (b.checkIn <= t && t < b.checkOut) busy[String(b.roomNumber)] = true;
     });
@@ -731,7 +742,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     }
     var b = bs[0], st = statusOf(b, day);
     return '<button class="cell ' + st.cls + clash + '"' + a + ' aria-label="Room ' + esc(room) + ', ' + fmtLong(day) + ', ' + st.label + ', ' + esc(b.guestName) + '">' +
-      '<span class="tag">' + st.tag + ((st.cls === 'in' && b.checkedInAt) || ((st.cls === 'out' || st.cls === 'day') && isDeparted(b)) ? ' \u2713' : '') + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
+      '<span class="tag">' + st.tag + ((st.cls === 'in' && isArrived(b)) || ((st.cls === 'out' || st.cls === 'day') && isDeparted(b)) ? ' \u2713' : '') + '</span><span class="who">' + esc(b.guestName) + '</span>' + (b.company ? '<span class="co">' + esc(b.company) + '</span>' : '') + '</button>';
   }
 
   function renderGrid() {
@@ -756,7 +767,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
 
   function stayBadge(b, t) {
     if (isDeparted(b)) return '<span class="badge">Checked out</span>';
-    if (b.checkIn === t) return b.checkedInAt ? '<span class="badge in">Checked in</span>' : '<span class="badge in">Arriving today</span>';
+    if (b.checkIn === t) return isArrived(b) ? '<span class="badge in">Checked in</span>' : '<span class="badge in">Arriving today</span>';
     if (b.checkOut === t) return '<span class="badge out">Leaving today</span>';
     if (b.checkIn < t && t < b.checkOut) return '<span class="badge stay">In house</span>';
     return '<span class="badge">Upcoming</span>';
@@ -1223,7 +1234,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   /* ---------- share bookings (summary text only) ---------- */
   function statusText(b, t) {
     if (isDeparted(b)) return 'Checked out';
-    if (b.checkIn === t) return b.checkedInAt ? 'Checked in' : 'Arriving today';
+    if (b.checkIn === t) return isArrived(b) ? 'Checked in' : 'Arriving today';
     if (b.checkOut === t) return 'Leaving today';
     if (b.checkIn < t && t < b.checkOut) return 'In house';
     return 'Upcoming';
@@ -1240,7 +1251,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     var now = new Date(), t = ymd(now);
     var stamp = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
     var arr = list.filter(function (b) { return b.checkIn === t; }).length;
-    var arrIn = list.filter(function (b) { return b.checkIn === t && b.checkedInAt; }).length;
+    var arrIn = list.filter(function (b) { return b.checkIn === t && isArrived(b); }).length;
     var dep = list.filter(function (b) { return b.checkOut === t && !isDeparted(b); }).length;
     var gone = list.filter(function (b) { return b.checkOut === t && isDeparted(b); }).length;
     var thick = '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501';
