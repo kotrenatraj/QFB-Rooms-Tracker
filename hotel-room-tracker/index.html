@@ -115,7 +115,7 @@ label.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5p
 .preprow .d { color: var(--muted); font-size: 12px; margin-top: 1px; }
 .preprow .d.urgent { color: var(--danger); font-weight: 600; }
 .prepdot { display: block; font-family: var(--font-body); font-size: 9px; letter-spacing: 0.05em; color: var(--out); font-weight: 700; line-height: 1; margin-top: 2px; }
-.hkitem { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); font: inherit; font-size: 15px; cursor: pointer; }
+.hkitem { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
 .hkitem .box { flex: none; width: 24px; height: 24px; border: 2px solid var(--vac); border-radius: 7px; display: grid; place-items: center; color: transparent; font-weight: 700; }
 .hkitem .nm { flex: 1; min-width: 0; }
 .hkitem .tm { font-size: 12px; color: var(--muted); }
@@ -738,9 +738,18 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('nightsRangeSub').textContent = r ? (r.days + (r.days === 1 ? ' day' : ' days') + ' \u00b7 ' + nightsText(r)) : (state.rangeFrom && state.rangeTo ? 'To must be on or after From' : '');
   }
   /* ---------- room preparation after check-out ---------- */
-  var HK = [['cleaning', 'Room cleaned'], ['bedding', 'Bedding changed'], ['toiletries', 'Toiletries arranged'], ['towels', 'Towels arranged']];
-  function hkMissing(b) { return HK.filter(function (k) { return !(b.hk && b.hk[k[0]]); }); }
-  function hkNames(list) { return list.map(function (k) { return k[1].toLowerCase(); }).join(', '); }
+  var HK = [['cleaning', 'Room cleaned'], ['bedding', 'Bedding changed'], ['toiletries', 'Toiletries arranged'], ['towels', 'Towels arranged'],
+    ['bottles', 'Drinking water bottles placed'], ['teacoffee', 'Tea/coffee and sugar sachets stocked'], ['kettle', 'Water kettle checked'],
+    ['ac', 'AC checked'], ['geyser', 'Geyser checked'], ['waterquality', 'Bathroom water quality checked']];
+  /* checklists started before the extra tasks existed (no _v marker) keep only the original four */
+  function hkItems(b) { return b.hk && b.hk._v >= 2 ? HK : HK.slice(0, 4); }
+  function hkNewList() { return { _v: 2 }; }
+  function hkMissing(b) { return hkItems(b).filter(function (k) { return !(b.hk && b.hk[k[0]]); }); }
+  function hkLow(l) { return /^[A-Z]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1); }
+  function hkNames(list, max) {
+    var names = list.map(function (k) { return hkLow(k[1]); });
+    return max && names.length > max ? names.slice(0, max).join(', ') + ' +' + (names.length - max) + ' more' : names.join(', ');
+  }
   /* the booking whose check-out left the room unprepared, or null when the room is ready */
   function prepFor(room) {
     room = String(room);
@@ -787,7 +796,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     el.hidden = false;
     el.innerHTML = '<h3>Prepare rooms before the next guest (' + list.length + ')</h3>' + list.slice(0, 6).map(function (x) {
       var urgent = x.next && x.next.checkIn === t;
-      return '<div class="preprow"><div class="t"><b>Room ' + esc(x.room) + '</b> &middot; ' + x.pf.missing.length + ' of 4 left: ' + esc(hkNames(x.pf.missing)) +
+      return '<div class="preprow"><div class="t"><b>Room ' + esc(x.room) + '</b> &middot; ' + x.pf.missing.length + ' of ' + hkItems(x.pf.b).length + ' left: ' + esc(hkNames(x.pf.missing, 3)) +
         (x.next ? '<div class="d' + (urgent ? ' urgent' : '') + '">' + (urgent ? '\u26a0 ' : '') + esc(nextText(x.next)) + '</div>' : '') + '</div>' +
         '<button class="btn small primary" data-action="prep" data-room="' + esc(x.room) + '">Open</button></div>';
     }).join('') + (list.length > 6 ? '<div class="d" style="margin-top:6px">+ ' + (list.length - 6) + ' more rooms (look for PREP in the room column)</div>' : '');
@@ -800,7 +809,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     $('sheetBody').innerHTML =
       '<div class="hint" style="margin:0 0 8px">' + esc(b.guestName) + ' checked out ' + esc(stampText(b.checkedOutAt)) + '. Tick each task as it is done.</div>' +
       (nb ? '<div class="timewarn" style="' + (urgent ? '' : 'background:var(--out-bg);color:var(--out)') + '">' + (urgent ? '\u26a0 ' : '') + esc(nextText(nb)) + '</div>' : '') +
-      HK.map(function (k) {
+      hkItems(b).map(function (k) {
         var on = b.hk && b.hk[k[0]];
         return '<button class="hkitem' + (on ? ' done' : '') + '" data-action="hk" data-id="' + b.id + '" data-k="' + k[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="box">\u2713</span><span class="nm">' + esc(k[1]) + '</span>' + (on ? '<span class="tm">' + esc(stampText(on)) + '</span>' : '') + '</button>';
       }).join('') +
@@ -824,7 +833,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     state.bookings.forEach(function (b) {
       if (b.id !== id) return;
       b.hk = b.hk || {};
-      HK.forEach(function (k) { if (!b.hk[k[0]]) b.hk[k[0]] = new Date().toISOString(); });
+      hkItems(b).forEach(function (k) { if (!b.hk[k[0]]) b.hk[k[0]] = new Date().toISOString(); });
       hkDone(b, b.roomNumber);
     });
   }
@@ -1114,7 +1123,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
       return cmpRoom(a.roomNumber, b.roomNumber) || (a.checkIn < b.checkIn ? -1 : 1);
     });
     var rows = [['Room', 'Guest', 'Company', 'Check-in', 'Check-out', 'Nights', 'Checked in', 'Check-in time', 'Check-out time', 'Checked out', 'Room prep done']];
-    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '', b.inTime || '', b.outTime || '', b.checkedOutAt ? stampLocal(b.checkedOutAt) : '', b.hk ? (HK.filter(function (k) { return b.hk[k[0]]; }).map(function (k) { return k[1]; }).join('; ') || 'none') : '']); });
+    sorted.forEach(function (b) { rows.push([String(b.roomNumber), b.guestName, b.company || '', b.checkIn, b.checkOut, nights(b), b.checkedInAt ? stampLocal(b.checkedInAt) : '', b.inTime || '', b.outTime || '', b.checkedOutAt ? stampLocal(b.checkedOutAt) : '', b.hk ? (hkItems(b).filter(function (k) { return b.hk[k[0]]; }).map(function (k) { return k[1]; }).join('; ') || 'none') : '']); });
     var ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 26 }, { wch: 13 }, { wch: 13 }, { wch: 8 }, { wch: 17 }, { wch: 14 }, { wch: 15 }, { wch: 17 }, { wch: 34 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
@@ -1240,7 +1249,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
           }
           if (cHk >= 0 && row[cHk]) {
             var hv = String(row[cHk]).trim().toLowerCase(), stamp = rec.checkedOutAt || new Date().toISOString();
-            rec.hk = {};
+            rec.hk = hkNewList();
             HK.forEach(function (k) { if (hv.indexOf(k[1].toLowerCase()) >= 0) rec.hk[k[0]] = stamp; });
           }
           out.push(rec);
@@ -1410,7 +1419,7 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     state.bookings.forEach(function (b) {
       if (b.id !== id) return;
       hit = b;
-      if (on) { b.checkedOutAt = new Date().toISOString(); b.hk = {}; } else { delete b.checkedOutAt; delete b.hk; }
+      if (on) { b.checkedOutAt = new Date().toISOString(); b.hk = hkNewList(); } else { delete b.checkedOutAt; delete b.hk; }
     });
     if (!hit) return;
     persist(); closeSheet(); render();
