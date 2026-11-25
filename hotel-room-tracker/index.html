@@ -1246,13 +1246,35 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
     catch (e) { toast('Could not build the Excel file.'); return; }
     var fname = 'Hotel_Bookings_' + ymd(new Date()) + '.xlsx';
     if (!downloads) {
-      /* outside Claude's viewer: a normal browser download */
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      a.download = fname;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      toast('Exported ' + fname + '. Use Import on another device to load it.');
+      /* outside Claude's viewer: let the person pick where to save (Drive, SD card...) when Chrome allows it */
+      var XT = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      var blob = new Blob([buf], { type: XT });
+      var fallback = function () {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        toast('Exported ' + fname + ' to your Downloads. Use Import on another device to load it.');
+      };
+      var ok = function (where) { toast('Saved ' + fname + (where ? ' in ' + where : '') + '. Use Import on another device to load it.'); };
+      var failed = function (e) {
+        if (e && e.name === 'AbortError') { toast('Export cancelled.'); return; }
+        fallback();
+      };
+      if (window.showSaveFilePicker) {
+        window.showSaveFilePicker({ suggestedName: fname, types: [{ description: 'Excel workbook', accept: { [XT]: ['.xlsx'] } }] })
+          .then(function (h) { return h.createWritable().then(function (w) { return w.write(blob).then(function () { return w.close(); }); }).then(function () { ok(''); }); })
+          .catch(failed);
+        return;
+      }
+      if (window.showDirectoryPicker) {
+        window.showDirectoryPicker({ mode: 'readwrite' })
+          .then(function (d) { return d.getFileHandle(fname, { create: true }).then(function (fh) { return fh.createWritable(); }).then(function (w) { return w.write(blob).then(function () { return w.close(); }); }).then(function () { ok('"' + d.name + '"'); }); })
+          .catch(failed);
+        return;
+      }
+      fallback();
       return;
     }
     downloads.save({ filename: fname, data: buf }).then(function () {
@@ -1610,5 +1632,3 @@ div.lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;
   }
 })();
 </script>
-
-</body></html>

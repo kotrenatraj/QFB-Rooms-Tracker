@@ -38,7 +38,7 @@ Repository **Settings > Pages > Build and deployment**, choose **Deploy from a b
 
 ## Data
 
-Bookings and settings are stored in the browser's `localStorage`, so they stay on one device. Use **Export** (Settings tab) on one device and **Import** on another to move them. The export workbook has three sheets: `Bookings`, `Weekly Occupancy` and `Settings`. Import reads the `Bookings` sheet (columns: Room, Guest, Company, Check-in, Check-out; files without a Company column still import) and the `Settings` sheet.
+Bookings and settings are stored in the browser's `localStorage`, so they stay on one device. Use **Export** (Settings tab) on one device and **Import** on another to move them. The export workbook has three sheets: `Bookings`, `Weekly Occupancy` and `Settings`. Import reads the `Bookings` sheet (columns: Room, Guest, Company, Check-in, Check-out; files without a Company column still import) and the `Settings` sheet. In Chrome, **Export** opens the save dialog so you can pick any location, including Google Drive on Android; if the browser has no such dialog, the file goes to Downloads.
 
 ## Notes
 
